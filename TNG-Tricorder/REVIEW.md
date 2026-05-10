@@ -6,7 +6,7 @@ Date: 2026-05-10
 
 1. High: No git repository initialized
 - Impact: Cannot commit or push this app to GitHub yet.
-- Action taken: Initialized repository locally.
+- Action taken: Initialized repository at the top-level `R1-Creations` folder.
 
 2. Medium: Scan race condition in rapid re-trigger scenarios
 - Impact: Multiple overlapping scan timers could complete out of order.
