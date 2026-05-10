@@ -300,24 +300,43 @@ function renderMedicalOutline() {
   const figureWrap = document.createElement("div");
   figureWrap.className = "medical-figure-wrap";
   figureWrap.innerHTML = `
-    <svg class="medical-figure" viewBox="0 0 100 180" aria-hidden="true">
-      <g transform="translate(8,6) scale(0.84)">
-        <circle class="medical-outline" cx="26" cy="13" r="7.5" />
-        <path class="medical-outline" d="M22 22 Q29 23 32 30 L33 53 Q33 62 29 68 L30 87 L29 121 L25 165 L20 165 L21 121 L20 90 Q17 84 17 74 L16 57 Q15 46 17 38 Q18 30 22 22 Z" />
-      </g>
-      <g transform="translate(43,4) scale(0.88)">
-        <circle class="medical-outline" cx="27" cy="14" r="8" />
-        <path class="medical-outline" d="M15 31 Q19 23 27 23 Q35 23 39 31 L41 54 Q41 64 35 71 L33 86 L36 116 L34 165 L29 165 L27 119 L25 165 L20 165 L18 116 L21 86 L19 71 Q13 64 13 54 Z" />
-        <path class="medical-outline" d="M15 35 L7 50 L8 81 L14 81 L14 57 L21 40 Z" />
-        <path class="medical-outline" d="M39 35 L47 50 L46 81 L40 81 L40 57 L33 40 Z" />
-        <path class="medical-outline" d="M22 86 L18 118 L20 165 L25 165 L25 118 L27 86 Z" />
-        <path class="medical-outline" d="M32 86 L36 118 L34 165 L29 165 L29 118 L27 86 Z" />
-        <path class="medical-spine" d="M27 39v96" />
-        <path class="medical-rib" d="M18 50h18M16 58h22M17 66h20" />
-        <ellipse class="medical-organ" cx="23" cy="58" rx="2.6" ry="4.1" />
-        <ellipse class="medical-organ" cx="31" cy="58" rx="2.6" ry="4.1" />
-        <ellipse class="medical-organ" cx="27" cy="73" rx="4" ry="5.8" />
-      </g>
+    <svg class="medical-figure" viewBox="0 0 120 240" aria-hidden="true">
+      <!-- Head -->
+      <circle cx="60" cy="30" r="14" class="medical-outline" />
+
+      <!-- Neck -->
+      <line x1="60" y1="44" x2="60" y2="56" class="medical-outline" />
+
+      <!-- Shoulders + Torso -->
+      <path d="
+        M 30 56
+        L 90 56
+        M 60 56
+        L 60 140
+      " class="medical-outline" />
+
+      <!-- Arms -->
+      <path d="
+        M 30 56
+        L 24 100
+        L 24 140
+        M 90 56
+        L 96 100
+        L 96 140
+      " class="medical-outline" />
+
+      <!-- Hips -->
+      <line x1="44" y1="140" x2="76" y2="140" class="medical-outline" />
+
+      <!-- Legs -->
+      <path d="
+        M 44 140
+        L 44 200
+        L 52 228
+        M 76 140
+        L 76 200
+        L 68 228
+      " class="medical-outline" />
     </svg>
   `;
 
