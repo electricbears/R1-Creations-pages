@@ -99,3 +99,92 @@ body {
   overflow: hidden;
 }
 
+.medical-view {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.medical-figure {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  width: 36%;
+  height: 84%;
+  transform: translateX(-50%);
+}
+
+.medical-part {
+  position: absolute;
+  border: 1px solid #66ccff;
+  background: rgba(102, 204, 255, 0.06);
+}
+
+.medical-head {
+  left: 34%;
+  top: 0;
+  width: 32%;
+  height: 16%;
+  border-radius: 999px;
+}
+
+.medical-torso {
+  left: 26%;
+  top: 17%;
+  width: 48%;
+  height: 35%;
+  border-radius: 18px;
+}
+
+.medical-arm-left,
+.medical-arm-right {
+  top: 20%;
+  width: 18%;
+  height: 30%;
+  border-radius: 12px;
+}
+
+.medical-arm-left {
+  left: 4%;
+}
+
+.medical-arm-right {
+  right: 4%;
+}
+
+.medical-leg-left,
+.medical-leg-right {
+  top: 54%;
+  width: 20%;
+  height: 44%;
+  border-radius: 12px;
+}
+
+.medical-leg-left {
+  left: 27%;
+}
+
+.medical-leg-right {
+  right: 27%;
+}
+
+.medical-scan-line {
+  position: absolute;
+  left: 8%;
+  width: 84%;
+  height: 2px;
+  background: #ff6666;
+  box-shadow: 0 0 6px #ff6666;
+  opacity: 0.9;
+}
+
+.medical-issue-marker {
+  position: absolute;
+  left: 52%;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #ffcc66;
+  box-shadow: 0 0 6px #ffcc66;
+}
+
