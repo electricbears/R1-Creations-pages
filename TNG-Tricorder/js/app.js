@@ -10,6 +10,8 @@ const graphArea = document.getElementById("graph-area");
 const buttons = document.querySelectorAll(".lcars-button");
 let activeScanTimer = null;
 let activeMedicalInterval = null;
+let activeLifeformFrame = null;
+let lifeformRadarState = null;
 let audioContext = null;
 
 const appSettings = {
@@ -202,6 +204,15 @@ function clearActiveScan() {
     clearInterval(activeMedicalInterval);
     activeMedicalInterval = null;
   }
+  stopLifeformRadar();
+}
+
+function stopLifeformRadar() {
+  if (activeLifeformFrame) {
+    cancelAnimationFrame(activeLifeformFrame);
+    activeLifeformFrame = null;
+  }
+  lifeformRadarState = null;
 }
 
 function updateModeUI() {
@@ -222,6 +233,8 @@ function updateModeUI() {
     renderMedicalOutline();
   } else if (mode === "settings") {
     renderSettingsPanel();
+  } else if (mode === "lifeform") {
+    renderLifeformRadar();
   } else {
     renderGraph();
   }
@@ -284,7 +297,12 @@ function renderMedicalOutline() {
   figureWrap.className = "medical-figure-wrap";
   figureWrap.innerHTML = `
     <svg class="medical-figure" viewBox="0 0 100 180" aria-hidden="true">
-      <path class="medical-outline" d="M50 8c8 0 13 8 13 16 0 6-2 10-5 13 4 3 8 9 8 17v26c0 4 2 8 5 12l8 9c2 2 2 5 0 7-2 2-5 2-7 0l-7-8v35c0 4-3 7-7 7s-7-3-7-7v-36h-2v36c0 4-3 7-7 7s-7-3-7-7v-35l-7 8c-2 2-5 2-7 0-2-2-2-5 0-7l8-9c3-4 5-8 5-12V54c0-8 4-14 8-17-3-3-5-7-5-13 0-8 5-16 13-16z" />
+      <circle class="medical-outline" cx="50" cy="16" r="8" />
+      <rect class="medical-outline" x="40" y="27" width="20" height="45" rx="8" />
+      <path class="medical-outline" d="M40 33 L30 50 L32 74 L38 74 L36 53 L44 38 Z" />
+      <path class="medical-outline" d="M60 33 L70 50 L68 74 L62 74 L64 53 L56 38 Z" />
+      <path class="medical-outline" d="M45 72 L41 112 L44 156 L50 156 L49 112 L51 72 Z" />
+      <path class="medical-outline" d="M55 72 L59 112 L56 156 L50 156 L51 112 L49 72 Z" />
       <path class="medical-spine" d="M50 44v88" />
       <path class="medical-rib" d="M40 54h20M38 62h24M39 70h22" />
       <ellipse class="medical-organ" cx="45" cy="64" rx="3" ry="5" />
@@ -304,6 +322,120 @@ function renderMedicalOutline() {
   graphArea.appendChild(figureWrap);
   graphArea.appendChild(scanGlow);
   graphArea.appendChild(scanLine);
+}
+
+function createLifeformContacts(count) {
+  const contacts = [];
+  for (let i = 0; i < count; i++) {
+    contacts.push({
+      angle: randomInt(0, 359),
+      radiusPct: randomInt(24, 44),
+      revealedAt: null
+    });
+  }
+  return contacts;
+}
+
+function isSweepPassing(lastAngle, currentAngle, targetAngle) {
+  const l = (lastAngle + 360) % 360;
+  const c = (currentAngle + 360) % 360;
+  const t = (targetAngle + 360) % 360;
+  if (l <= c) {
+    return t >= l && t <= c;
+  }
+  return t >= l || t <= c;
+}
+
+function renderLifeformRadar(contacts = []) {
+  graphArea.innerHTML = "";
+  graphArea.classList.remove("medical-view");
+
+  const radar = document.createElement("div");
+  radar.className = "radar-view";
+  radar.innerHTML = `
+    <div class="radar-ring ring-1"></div>
+    <div class="radar-ring ring-2"></div>
+    <div class="radar-ring ring-3"></div>
+    <div class="radar-ring ring-4"></div>
+    <div class="radar-axis axis-h"></div>
+    <div class="radar-axis axis-v"></div>
+    <div class="radar-sweep-trail"></div>
+    <div class="radar-sweep-hand"></div>
+  `;
+
+  graphArea.appendChild(radar);
+
+  const sweepHand = radar.querySelector(".radar-sweep-hand");
+  const sweepTrail = radar.querySelector(".radar-sweep-trail");
+  const contactNodes = contacts.map(contact => {
+    const marker = document.createElement("div");
+    marker.className = "radar-contact";
+    const radians = (contact.angle - 90) * (Math.PI / 180);
+    const x = 50 + Math.cos(radians) * contact.radiusPct;
+    const y = 50 + Math.sin(radians) * contact.radiusPct;
+    marker.style.left = `${x}%`;
+    marker.style.top = `${y}%`;
+    radar.appendChild(marker);
+    return { ...contact, marker };
+  });
+
+  lifeformRadarState = {
+    angle: 0,
+    lastAngle: 0,
+    lastTick: performance.now(),
+    contacts: contactNodes
+  };
+
+  const tick = now => {
+    if (!lifeformRadarState) {
+      return;
+    }
+
+    const elapsed = now - lifeformRadarState.lastTick;
+    lifeformRadarState.lastTick = now;
+    lifeformRadarState.lastAngle = lifeformRadarState.angle;
+    lifeformRadarState.angle = (lifeformRadarState.angle + elapsed * 0.16) % 360;
+
+    sweepHand.style.transform = `translate(-50%, -50%) rotate(${lifeformRadarState.angle}deg)`;
+    sweepTrail.style.transform = `translate(-50%, -50%) rotate(${lifeformRadarState.angle - 8}deg)`;
+
+    lifeformRadarState.contacts.forEach(contact => {
+      if (
+        contact.revealedAt === null &&
+        isSweepPassing(lifeformRadarState.lastAngle, lifeformRadarState.angle, contact.angle)
+      ) {
+        contact.revealedAt = now;
+      }
+
+      if (contact.revealedAt !== null) {
+        const fade = Math.max(0, 1 - (now - contact.revealedAt) / 1800);
+        contact.marker.style.opacity = fade.toFixed(3);
+      }
+    });
+
+    activeLifeformFrame = requestAnimationFrame(tick);
+  };
+
+  activeLifeformFrame = requestAnimationFrame(tick);
+}
+
+function runLifeformScan() {
+  const count = randomInt(1, 5);
+  const contacts = createLifeformContacts(count);
+  renderLifeformRadar(contacts);
+  playModeSound("lifeform", "start");
+  primaryReadout.textContent = "Sweeping for bio-signs...";
+  secondaryReadout.textContent = "Rotational sensor sweep in progress...";
+
+  activeScanTimer = setTimeout(() => {
+    primaryReadout.textContent = `Bio-signs detected: ${count} lifeforms within 20 meters.`;
+    secondaryReadout.textContent = "Dominant readings: humanoid, stable vitals, low threat index.";
+    statusLabel.textContent = "COMPLETE";
+    activeScanTimer = null;
+
+    playModeSound("lifeform", "complete");
+    speakIfEnabled("Lifeform scan complete. Multiple humanoid bio-signs detected. No immediate threat.");
+  }, 2100);
 }
 
 function renderSettingsPanel() {
@@ -414,6 +546,11 @@ function performScan() {
   if (mode === "medical") {
     primaryReadout.textContent = "Initiating bio-medical pass...";
     runMedicalScan();
+    return;
+  }
+
+  if (mode === "lifeform") {
+    runLifeformScan();
     return;
   }
 
