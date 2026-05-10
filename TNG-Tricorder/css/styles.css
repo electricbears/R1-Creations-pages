@@ -1,0 +1,101 @@
+body {
+  margin: 0;
+  background: #000;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #fff;
+}
+
+#app {
+  width: 240px;
+  height: 282px;
+  margin: 0 auto;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+}
+
+.lcars-header,
+.lcars-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 6px;
+  background: #ff9966;
+  border-radius: 0 0 12px 0;
+  font-size: 10px;
+}
+
+.lcars-footer {
+  border-radius: 0 12px 0 0;
+  background: #cc6699;
+}
+
+.lcars-main {
+  flex: 1;
+  display: flex;
+  padding: 4px;
+  gap: 4px;
+}
+
+.lcars-sidebar {
+  width: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lcars-button {
+  border: 0;
+  background: #ffcc66;
+  border-radius: 12px;
+  padding: 4px;
+  font-size: 9px;
+  text-align: left;
+  color: #111;
+  cursor: pointer;
+}
+
+.lcars-button.active {
+  background: #ff9966;
+}
+
+.lcars-button:focus-visible {
+  outline: 1px solid #66ccff;
+  outline-offset: 1px;
+}
+
+.lcars-display {
+  flex: 1;
+  background: #111;
+  border-radius: 12px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lcars-mode {
+  font-size: 9px;
+  color: #ffcc66;
+}
+
+.lcars-readout {
+  background: #222;
+  border-radius: 8px;
+  padding: 4px;
+  font-size: 9px;
+}
+
+.lcars-readout.small {
+  font-size: 8px;
+  color: #ccccff;
+}
+
+.lcars-graph {
+  flex: 1;
+  background: #000;
+  border-radius: 8px;
+  border: 1px solid #333;
+  position: relative;
+  overflow: hidden;
+}
+

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TNG Tricorder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <div class="lcars-header">
+      <span class="lcars-label">TR-590 Mk VII</span>
+      <span class="lcars-label right">STARFLEET SCIENCE</span>
+    </div>
+
+    <div class="lcars-main">
+      <div class="lcars-sidebar">
+        <button class="lcars-button" type="button" data-mode="lifeform">LIFEFORMS</button>
+        <button class="lcars-button" type="button" data-mode="atmosphere">ATMOSPHERE</button>
+        <button class="lcars-button" type="button" data-mode="diagnostics">DIAGNOSTICS</button>
+      </div>
+
+      <div class="lcars-display">
+        <div class="lcars-mode" id="mode-label">MODE: LIFEFORMS</div>
+        <div class="lcars-readout" id="primary-readout">Ready.</div>
+        <div class="lcars-readout small" id="secondary-readout">
+          Rotate wheel to change mode. Press button to scan.
+        </div>
+        <div class="lcars-graph" id="graph-area"></div>
+      </div>
+    </div>
+
+    <div class="lcars-footer">
+      <span class="lcars-label">SCANNING INTERFACE</span>
+      <span class="lcars-label right" id="status-label">IDLE</span>
+    </div>
+  </div>
+
+  <script src="js/hardware.js"></script>
+  <script src="js/speak.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
+
