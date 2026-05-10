@@ -293,21 +293,31 @@ function renderMedicalOutline() {
   graphArea.innerHTML = "";
   graphArea.classList.add("medical-view");
 
+  const board = document.createElement("div");
+  board.className = "medical-board";
+  graphArea.appendChild(board);
+
   const figureWrap = document.createElement("div");
   figureWrap.className = "medical-figure-wrap";
   figureWrap.innerHTML = `
     <svg class="medical-figure" viewBox="0 0 100 180" aria-hidden="true">
-      <circle class="medical-outline" cx="50" cy="16" r="8.5" />
-      <path class="medical-outline" d="M36 36 Q40 28 50 28 Q60 28 64 36 L66 58 Q66 68 58 72 L56 88 L60 116 L58 156 L52 156 L50 120 L48 156 L42 156 L40 116 L44 88 L42 72 Q34 68 34 58 Z" />
-      <path class="medical-outline" d="M36 40 L28 56 L30 82 L36 82 L35 58 L42 44 Z" />
-      <path class="medical-outline" d="M64 40 L72 56 L70 82 L64 82 L65 58 L58 44 Z" />
-      <path class="medical-outline" d="M44 88 L40 122 L43 156 L48 156 L48 122 L50 88 Z" />
-      <path class="medical-outline" d="M56 88 L60 122 L57 156 L52 156 L52 122 L50 88 Z" />
-      <path class="medical-spine" d="M50 44v88" />
-      <path class="medical-rib" d="M40 54h20M38 62h24M39 70h22" />
-      <ellipse class="medical-organ" cx="45" cy="64" rx="3" ry="5" />
-      <ellipse class="medical-organ" cx="55" cy="64" rx="3" ry="5" />
-      <ellipse class="medical-organ" cx="50" cy="80" rx="5" ry="7" />
+      <g transform="translate(8,6) scale(0.84)">
+        <circle class="medical-outline" cx="26" cy="13" r="7.5" />
+        <path class="medical-outline" d="M22 22 Q29 23 32 30 L33 53 Q33 62 29 68 L30 87 L29 121 L25 165 L20 165 L21 121 L20 90 Q17 84 17 74 L16 57 Q15 46 17 38 Q18 30 22 22 Z" />
+      </g>
+      <g transform="translate(43,4) scale(0.88)">
+        <circle class="medical-outline" cx="27" cy="14" r="8" />
+        <path class="medical-outline" d="M15 31 Q19 23 27 23 Q35 23 39 31 L41 54 Q41 64 35 71 L33 86 L36 116 L34 165 L29 165 L27 119 L25 165 L20 165 L18 116 L21 86 L19 71 Q13 64 13 54 Z" />
+        <path class="medical-outline" d="M15 35 L7 50 L8 81 L14 81 L14 57 L21 40 Z" />
+        <path class="medical-outline" d="M39 35 L47 50 L46 81 L40 81 L40 57 L33 40 Z" />
+        <path class="medical-outline" d="M22 86 L18 118 L20 165 L25 165 L25 118 L27 86 Z" />
+        <path class="medical-outline" d="M32 86 L36 118 L34 165 L29 165 L29 118 L27 86 Z" />
+        <path class="medical-spine" d="M27 39v96" />
+        <path class="medical-rib" d="M18 50h18M16 58h22M17 66h20" />
+        <ellipse class="medical-organ" cx="23" cy="58" rx="2.6" ry="4.1" />
+        <ellipse class="medical-organ" cx="31" cy="58" rx="2.6" ry="4.1" />
+        <ellipse class="medical-organ" cx="27" cy="73" rx="4" ry="5.8" />
+      </g>
     </svg>
   `;
 
@@ -319,7 +329,7 @@ function renderMedicalOutline() {
   scanLine.className = "medical-scan-line";
   scanLine.style.top = "8%";
 
-  graphArea.appendChild(figureWrap);
+  board.appendChild(figureWrap);
   graphArea.appendChild(scanGlow);
   graphArea.appendChild(scanLine);
 }
