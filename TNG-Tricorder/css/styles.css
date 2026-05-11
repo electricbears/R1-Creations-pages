@@ -32,7 +32,7 @@ body {
 .lcars-main {
   flex: 1;
   display: flex;
-  padding: 4px;
+  padding: 4px 4px 2px;
   gap: 4px;
 }
 
@@ -70,7 +70,7 @@ body {
   padding: 4px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .lcars-mode {
@@ -83,11 +83,17 @@ body {
   border-radius: 8px;
   padding: 4px;
   font-size: 9px;
+  min-height: 16px;
+  max-height: 16px;
+  line-height: 1.2;
+  overflow: hidden;
 }
 
 .lcars-readout.small {
   font-size: 8px;
   color: #ccccff;
+  min-height: 21px;
+  max-height: 21px;
 }
 
 .lcars-graph {
@@ -134,16 +140,16 @@ body {
 }
 
 .radar-axis.axis-h {
-  left: 9%;
-  right: 9%;
+  left: 0;
+  right: 0;
   top: 50%;
   height: 1px;
   transform: translateY(-50%);
 }
 
 .radar-axis.axis-v {
-  top: 9%;
-  bottom: 9%;
+  top: 0;
+  bottom: 0;
   left: 50%;
   width: 1px;
   transform: translateX(-50%);
@@ -172,11 +178,11 @@ body {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 42%;
+  width: 49%;
   height: 2px;
   background: linear-gradient(90deg, rgba(102, 255, 204, 0.95), rgba(102, 255, 204, 0.15));
   transform-origin: 0% 50%;
-  transform: translate(-50%, -50%) rotate(0deg);
+  transform: translateY(-50%) rotate(0deg);
   box-shadow: 0 0 8px rgba(102, 255, 204, 0.62);
   border-radius: 2px;
 }
@@ -347,5 +353,70 @@ body {
 .settings-toggle.off {
   background: #7b3d45;
   color: #ffeef0;
+}
+
+.sim-controls {
+  width: 240px;
+  margin: 8px auto 0;
+  padding: 6px;
+  border: 1px solid #3d3447;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #201a2a, #14101b);
+  box-sizing: border-box;
+  color: #ffe0bc;
+}
+
+.sim-controls-label {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  color: #ffb27a;
+  margin-bottom: 4px;
+}
+
+.sim-controls-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.sim-wheel,
+.sim-wheel-step,
+.sim-side-button {
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 4px;
+  font-size: 8px;
+  color: #110e0a;
+  cursor: pointer;
+}
+
+.sim-wheel {
+  background: linear-gradient(180deg, #ffcc80, #e3945f);
+  font-weight: 600;
+}
+
+.sim-wheel-step {
+  background: #d28cb8;
+}
+
+.sim-side-button {
+  width: 100%;
+  background: linear-gradient(180deg, #7fd3ff, #4c86bf);
+  color: #05111f;
+  font-weight: 700;
+}
+
+.sim-wheel:focus-visible,
+.sim-wheel-step:focus-visible,
+.sim-side-button:focus-visible {
+  outline: 1px solid #a8f7ff;
+  outline-offset: 1px;
+}
+
+.sim-controls-help {
+  margin-top: 4px;
+  font-size: 7px;
+  color: #d2c3ea;
 }
 

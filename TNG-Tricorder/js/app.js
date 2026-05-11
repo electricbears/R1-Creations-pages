@@ -12,6 +12,7 @@ let activeScanTimer = null;
 let activeMedicalInterval = null;
 let activeLifeformFrame = null;
 let lifeformRadarState = null;
+let lifeformScanActive = false;
 let audioContext = null;
 
 const appSettings = {
@@ -205,6 +206,7 @@ function clearActiveScan() {
     activeMedicalInterval = null;
   }
   stopLifeformRadar();
+  lifeformScanActive = false;
 }
 
 function stopLifeformRadar() {
@@ -316,43 +318,127 @@ function renderMedicalOutline() {
   graphArea.appendChild(scanLine);
 }
 
-function createLifeformContacts(count) {
-  const contacts = [];
-  for (let i = 0; i < count; i++) {
-    contacts.push({
-      angle: randomInt(0, 359),
-      radiusPct: randomInt(24, 44),
-      revealedAt: null
-    });
-  }
-  return contacts;
+const LIFEFORM_MIN_RANGE = 21;
+const LIFEFORM_MAX_RANGE = 46;
+const LIFEFORM_MAX_CONTACTS = 8;
+const LIFEFORM_SWEEP_FADE_MS = 3600;
+const LIFEFORM_EXIT_FADE_STEPS = 2;
+const LIFEFORM_EXIT_FADE_MS_PER_STEP = 900;
+const LIFEFORM_SWEEP_SPEED_DEG_PER_MS = 0.1;
+const LIFEFORM_MOVEMENT_BOOST = 2.8;
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
-function populateRadarContacts(radarState) {
-  radarState.contacts.forEach(contact => {
-    if (contact.marker && contact.marker.parentNode) {
-      contact.marker.parentNode.removeChild(contact.marker);
+function updateRadarMarkerPosition(contact, useLivePosition = false) {
+  const angle = useLivePosition ? contact.angle : contact.displayAngle;
+  const radiusPct = useLivePosition ? contact.radiusPct : contact.displayRadiusPct;
+  const radians = (angle - 90) * (Math.PI / 180);
+  const x = 50 + Math.cos(radians) * radiusPct;
+  const y = 50 + Math.sin(radians) * radiusPct;
+  contact.marker.style.left = `${x}%`;
+  contact.marker.style.top = `${y}%`;
+}
+
+function createLifeformContact(radarState, options = {}) {
+  const angle = options.angle ?? randomInt(0, 359);
+  const radiusPct = options.radiusPct ?? randomInt(24, 43);
+  const angularVelocity = options.angularVelocity ?? (Math.random() * 8 - 4);
+  const radialVelocity = options.radialVelocity ?? (Math.random() * 2.2 - 1.1);
+
+  const marker = document.createElement("div");
+  marker.className = "radar-contact";
+  marker.style.opacity = "0";
+
+  const contact = {
+    angle,
+    radiusPct,
+    displayAngle: angle,
+    displayRadiusPct: radiusPct,
+    angularVelocity,
+    radialVelocity,
+    revealedAt: null,
+    exiting: false,
+    exitStartedAt: null,
+    exitStartOpacity: 0,
+    marker
+  };
+
+  updateRadarMarkerPosition(contact);
+  radarState.radar.appendChild(marker);
+  return contact;
+}
+
+function seedLifeformContacts(radarState) {
+  const initialCount = randomInt(2, 5);
+  for (let i = 0; i < initialCount; i++) {
+    radarState.contacts.push(createLifeformContact(radarState));
+  }
+  radarState.currentCount = radarState.contacts.length;
+  radarState.maxCount = radarState.currentCount;
+}
+
+function stepLifeformContacts(radarState, elapsed, now) {
+  const sweepFraction = elapsed / 3600;
+  const movementFraction = sweepFraction * LIFEFORM_MOVEMENT_BOOST;
+  const velocityJitterScale = Math.min(1, elapsed / 180);
+
+  radarState.contacts = radarState.contacts.filter(contact => {
+    if (contact.exiting) {
+      return true;
     }
+
+    contact.angle = (
+      contact.angle +
+      (contact.angularVelocity + (Math.random() * 3.2 - 1.6)) * movementFraction +
+      360
+    ) % 360;
+    contact.radiusPct += (contact.radialVelocity + (Math.random() * 0.85 - 0.425)) * movementFraction;
+    contact.angularVelocity = clamp(
+      contact.angularVelocity + (Math.random() * 0.65 - 0.325) * velocityJitterScale * LIFEFORM_MOVEMENT_BOOST,
+      -5.5,
+      5.5
+    );
+    contact.radialVelocity = clamp(
+      contact.radialVelocity + (Math.random() * 0.55 - 0.275) * velocityJitterScale * LIFEFORM_MOVEMENT_BOOST,
+      -1.9,
+      1.9
+    );
+    const inRange = contact.radiusPct >= LIFEFORM_MIN_RANGE && contact.radiusPct <= LIFEFORM_MAX_RANGE;
+    if (!inRange) {
+      contact.exiting = true;
+      contact.exitStartedAt = now;
+      const currentOpacity = Number.parseFloat(contact.marker.style.opacity || "0");
+      contact.exitStartOpacity = Number.isFinite(currentOpacity) ? currentOpacity : 0;
+      if (contact.exitStartOpacity <= 0) {
+        contact.exitStartOpacity = 1;
+      }
+      return true;
+    }
+
+    return true;
   });
 
-  const nextCount = randomInt(1, 7);
-  const contacts = createLifeformContacts(nextCount);
+  const spawnChance = 0.38 * sweepFraction;
+  if (radarState.contacts.length < LIFEFORM_MAX_CONTACTS && Math.random() < spawnChance) {
+    radarState.contacts.push(
+      createLifeformContact(radarState, {
+        radiusPct: LIFEFORM_MAX_RANGE - Math.random() * 1.2,
+        radialVelocity: -(0.35 + Math.random() * 0.8),
+        angularVelocity: Math.random() * 4 - 2
+      })
+    );
+  }
 
-  radarState.contacts = contacts.map(contact => {
-    const marker = document.createElement("div");
-    marker.className = "radar-contact";
-    const radians = (contact.angle - 90) * (Math.PI / 180);
-    const x = 50 + Math.cos(radians) * contact.radiusPct;
-    const y = 50 + Math.sin(radians) * contact.radiusPct;
-    marker.style.left = `${x}%`;
-    marker.style.top = `${y}%`;
-    radarState.radar.appendChild(marker);
-    return { ...contact, marker };
-  });
+  const replenishChance = 0.65 * sweepFraction;
+  if (radarState.contacts.length < 2 && Math.random() < replenishChance) {
+    radarState.contacts.push(createLifeformContact(radarState));
+  }
 
-  radarState.currentCount = nextCount;
-  if (nextCount > radarState.maxCount) {
-    radarState.maxCount = nextCount;
+  radarState.currentCount = radarState.contacts.filter(contact => !contact.exiting).length;
+  if (radarState.currentCount > radarState.maxCount) {
+    radarState.maxCount = radarState.currentCount;
   }
 }
 
@@ -380,34 +466,31 @@ function renderLifeformRadar(options = {}) {
     <div class="radar-ring ring-4"></div>
     <div class="radar-axis axis-h"></div>
     <div class="radar-axis axis-v"></div>
-    <div class="radar-sweep-trail"></div>
     <div class="radar-sweep-hand"></div>
   `;
 
   graphArea.appendChild(radar);
 
   const sweepHand = radar.querySelector(".radar-sweep-hand");
-  const sweepTrail = radar.querySelector(".radar-sweep-trail");
   if (!animateSweep) {
     sweepHand.style.display = "none";
-    sweepTrail.style.display = "none";
     return;
   }
 
   lifeformRadarState = {
     radar,
     sweepHand,
-    sweepTrail,
     angle: 0,
     lastAngle: 0,
     lastTick: performance.now(),
+    scanStartedAt: performance.now(),
     contacts: [],
     currentCount: 0,
     maxCount: 0,
     sweeps: 0
   };
 
-  populateRadarContacts(lifeformRadarState);
+  seedLifeformContacts(lifeformRadarState);
 
   const tick = now => {
     if (!lifeformRadarState) {
@@ -417,29 +500,53 @@ function renderLifeformRadar(options = {}) {
     const elapsed = now - lifeformRadarState.lastTick;
     lifeformRadarState.lastTick = now;
     lifeformRadarState.lastAngle = lifeformRadarState.angle;
-    lifeformRadarState.angle = (lifeformRadarState.angle + elapsed * 0.16) % 360;
+    lifeformRadarState.angle = (lifeformRadarState.angle + elapsed * LIFEFORM_SWEEP_SPEED_DEG_PER_MS) % 360;
 
-    lifeformRadarState.sweepHand.style.transform = `translate(-50%, -50%) rotate(${lifeformRadarState.angle}deg)`;
-    lifeformRadarState.sweepTrail.style.transform = `translate(-50%, -50%) rotate(${lifeformRadarState.angle - 8}deg)`;
+    lifeformRadarState.sweepHand.style.transform = `translateY(-50%) rotate(${lifeformRadarState.angle}deg)`;
 
-    if (lifeformRadarState.lastAngle > lifeformRadarState.angle) {
-      lifeformRadarState.sweeps += 1;
-      populateRadarContacts(lifeformRadarState);
-    }
+    stepLifeformContacts(lifeformRadarState, elapsed, now);
 
     lifeformRadarState.contacts.forEach(contact => {
+      if (contact.exiting && contact.exitStartedAt !== null) {
+        const exitDuration = LIFEFORM_EXIT_FADE_STEPS * LIFEFORM_EXIT_FADE_MS_PER_STEP;
+        const progress = (now - contact.exitStartedAt) / exitDuration;
+        const fade = Math.max(0, contact.exitStartOpacity * (1 - progress));
+        contact.marker.style.opacity = fade.toFixed(3);
+        if (fade <= 0) {
+          if (contact.marker.parentNode) {
+            contact.marker.parentNode.removeChild(contact.marker);
+          }
+          contact.removePending = true;
+        }
+        return;
+      }
+
       if (
-        contact.revealedAt === null &&
-        isSweepPassing(lifeformRadarState.lastAngle, lifeformRadarState.angle, contact.angle)
+        now - lifeformRadarState.scanStartedAt >= 500 &&
+        isSweepPassing(
+          lifeformRadarState.lastAngle,
+          lifeformRadarState.angle,
+          contact.angle - 90
+        )
       ) {
+        contact.displayAngle = contact.angle;
+        contact.displayRadiusPct = contact.radiusPct;
+        updateRadarMarkerPosition(contact);
         contact.revealedAt = now;
+        contact.marker.style.opacity = "1";
       }
 
       if (contact.revealedAt !== null) {
-        const fade = Math.max(0, 1 - (now - contact.revealedAt) / 1800);
+        const fade = Math.max(0, 1 - (now - contact.revealedAt) / LIFEFORM_SWEEP_FADE_MS);
         contact.marker.style.opacity = fade.toFixed(3);
       }
     });
+
+    lifeformRadarState.contacts = lifeformRadarState.contacts.filter(contact => !contact.removePending);
+    lifeformRadarState.currentCount = lifeformRadarState.contacts.filter(contact => !contact.exiting).length;
+    if (lifeformRadarState.currentCount > lifeformRadarState.maxCount) {
+      lifeformRadarState.maxCount = lifeformRadarState.currentCount;
+    }
 
     activeLifeformFrame = requestAnimationFrame(tick);
   };
@@ -449,26 +556,33 @@ function renderLifeformRadar(options = {}) {
 
 function runLifeformScan() {
   renderLifeformRadar({ animateSweep: true });
+  lifeformScanActive = true;
   playModeSound("lifeform", "start");
   primaryReadout.textContent = "Sweeping for bio-signs...";
-  secondaryReadout.textContent = "Rotational sensor sweep in progress. Signatures may be moving.";
+  secondaryReadout.textContent = "Rotational sensor sweep active. Press scan again to stop.";
+}
 
-  activeScanTimer = setTimeout(() => {
-    const count = lifeformRadarState ? lifeformRadarState.currentCount : randomInt(1, 7);
-    const peak = lifeformRadarState ? lifeformRadarState.maxCount : count;
-    primaryReadout.textContent = `Bio-signs detected: ${count} lifeforms within 20 meters.`;
-    secondaryReadout.textContent = "Dominant readings: humanoid, stable vitals, low threat index.";
-    if (peak !== count) {
-      secondaryReadout.textContent += ` Movement observed: fluctuated to ${peak}.`;
-    }
-    statusLabel.textContent = "COMPLETE";
-    activeScanTimer = null;
-    stopLifeformRadar();
-    renderLifeformRadar({ animateSweep: false });
+function stopLifeformScan() {
+  if (!lifeformScanActive) {
+    return;
+  }
 
-    playModeSound("lifeform", "complete");
-    speakIfEnabled("Lifeform scan complete. Multiple humanoid bio-signs detected. No immediate threat.");
-  }, 4300);
+  const count = lifeformRadarState ? lifeformRadarState.currentCount : randomInt(1, 7);
+  const peak = lifeformRadarState ? lifeformRadarState.maxCount : count;
+
+  stopLifeformRadar();
+  renderLifeformRadar({ animateSweep: false });
+  lifeformScanActive = false;
+
+  primaryReadout.textContent = `Bio-signs detected: ${count} lifeforms within 20 meters.`;
+  secondaryReadout.textContent = "Dominant readings: humanoid, stable vitals, low threat index.";
+  if (peak !== count) {
+    secondaryReadout.textContent += ` Movement observed: fluctuated to ${peak}.`;
+  }
+  statusLabel.textContent = "IDLE";
+
+  playModeSound("lifeform", "complete");
+  speakIfEnabled("Lifeform sweep stopped. Latest bio-sign count available on screen.");
 }
 
 function renderSettingsPanel() {
@@ -570,20 +684,25 @@ function runMedicalScan() {
 }
 
 function performScan() {
-  clearActiveScan();
-
   const mode = MODES[currentModeIndex];
+  if (mode === "lifeform") {
+    if (lifeformScanActive) {
+      stopLifeformScan();
+    } else {
+      clearActiveScan();
+      statusLabel.textContent = "SCANNING...";
+      runLifeformScan();
+    }
+    return;
+  }
+
+  clearActiveScan();
   statusLabel.textContent = "SCANNING...";
   secondaryReadout.textContent = "Collecting sensor telemetry...";
 
   if (mode === "medical") {
     primaryReadout.textContent = "Initiating bio-medical pass...";
     runMedicalScan();
-    return;
-  }
-
-  if (mode === "lifeform") {
-    runLifeformScan();
     return;
   }
 
