@@ -302,6 +302,25 @@ body {
   box-shadow: 0 0 7px #ffcc66;
 }
 
+.medical-issue-marker.confirmed {
+  animation: medical-marker-affirm 440ms ease-out 2;
+}
+
+@keyframes medical-marker-affirm {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  45% {
+    transform: scale(2.1);
+    filter: brightness(1.55);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
 .settings-panel {
   display: flex;
   flex-direction: column;

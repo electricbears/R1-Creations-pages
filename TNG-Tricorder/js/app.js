@@ -10,10 +10,12 @@ const graphArea = document.getElementById("graph-area");
 const buttons = document.querySelectorAll(".lcars-button");
 let activeScanTimer = null;
 let activeMedicalInterval = null;
+let activeMedicalFrame = null;
 let activeLifeformFrame = null;
 let lifeformRadarState = null;
 let lifeformScanActive = false;
 let audioContext = null;
+let medicalAmbience = null;
 
 const appSettings = {
   systemSounds: true,
@@ -68,9 +70,6 @@ const MEDICAL_ZONES = [
 function setModeByName(name) {
   const idx = MODES.indexOf(name);
   if (idx >= 0) {
-    if (currentModeIndex !== idx) {
-      playModeSound(name, "select");
-    }
     currentModeIndex = idx;
     updateModeUI();
   }
@@ -78,7 +77,6 @@ function setModeByName(name) {
 
 function cycleMode(delta) {
   currentModeIndex = (currentModeIndex + delta + MODES.length) % MODES.length;
-  playModeSound(MODES[currentModeIndex], "select");
   updateModeUI();
 }
 
@@ -187,6 +185,189 @@ function playModeSound(mode, eventType) {
   });
 }
 
+function stopMedicalAmbience() {
+  if (!medicalAmbience) {
+    return;
+  }
+
+  const { ctx, masterGain, sources } = medicalAmbience;
+  const stopAt = ctx.currentTime + 0.25;
+  masterGain.gain.cancelScheduledValues(ctx.currentTime);
+  masterGain.gain.setValueAtTime(Math.max(masterGain.gain.value, 0.0001), ctx.currentTime);
+  masterGain.gain.exponentialRampToValueAtTime(0.0001, stopAt);
+
+  sources.forEach(source => {
+    try {
+      source.stop(stopAt);
+    } catch (_err) {
+      // Ignore stop errors for already-ended sources.
+    }
+  });
+
+  medicalAmbience = null;
+}
+
+function startMedicalAmbience() {
+  if (!appSettings.systemSounds) {
+    return;
+  }
+
+  const ctx = ensureAudioContext();
+  if (!ctx) {
+    return;
+  }
+  if (ctx.state === "suspended") {
+    ctx.resume().catch(() => {});
+  }
+
+  stopMedicalAmbience();
+
+  const now = ctx.currentTime;
+  const masterGain = ctx.createGain();
+  masterGain.gain.setValueAtTime(0.0001, now);
+  masterGain.gain.exponentialRampToValueAtTime(0.034, now + 0.8);
+
+  const droneA = ctx.createOscillator();
+  const droneAGain = ctx.createGain();
+  droneA.type = "sine";
+  droneA.frequency.value = 136;
+  droneAGain.gain.value = 0.45;
+
+  const droneB = ctx.createOscillator();
+  const droneBGain = ctx.createGain();
+  droneB.type = "triangle";
+  droneB.frequency.value = 204;
+  droneBGain.gain.value = 0.2;
+
+  const shimmer = ctx.createOscillator();
+  const shimmerGain = ctx.createGain();
+  shimmer.type = "sine";
+  shimmer.frequency.value = 980;
+  shimmerGain.gain.value = 0.02;
+
+  const lfo = ctx.createOscillator();
+  const lfoGainA = ctx.createGain();
+  const lfoGainB = ctx.createGain();
+  const lfoGainShimmer = ctx.createGain();
+  lfo.type = "sine";
+  lfo.frequency.value = 0.16;
+  lfoGainA.gain.value = 7;
+  lfoGainB.gain.value = 4;
+  lfoGainShimmer.gain.value = 22;
+
+  const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const noiseData = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < noiseData.length; i++) {
+    noiseData[i] = (Math.random() * 2 - 1) * 0.42;
+  }
+
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer;
+  noise.loop = true;
+
+  const noiseBandpass = ctx.createBiquadFilter();
+  noiseBandpass.type = "bandpass";
+  noiseBandpass.frequency.value = 1200;
+  noiseBandpass.Q.value = 0.7;
+
+  const noiseLowpass = ctx.createBiquadFilter();
+  noiseLowpass.type = "lowpass";
+  noiseLowpass.frequency.value = 2100;
+
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.value = 0.07;
+
+  lfo.connect(lfoGainA);
+  lfo.connect(lfoGainB);
+  lfo.connect(lfoGainShimmer);
+  lfoGainA.connect(droneA.detune);
+  lfoGainB.connect(droneB.detune);
+  lfoGainShimmer.connect(shimmer.detune);
+
+  droneA.connect(droneAGain);
+  droneB.connect(droneBGain);
+  shimmer.connect(shimmerGain);
+  noise.connect(noiseBandpass);
+  noiseBandpass.connect(noiseLowpass);
+  noiseLowpass.connect(noiseGain);
+
+  droneAGain.connect(masterGain);
+  droneBGain.connect(masterGain);
+  shimmerGain.connect(masterGain);
+  noiseGain.connect(masterGain);
+  masterGain.connect(ctx.destination);
+
+  droneA.start(now);
+  droneB.start(now);
+  shimmer.start(now);
+  lfo.start(now);
+  noise.start(now);
+
+  medicalAmbience = {
+    ctx,
+    masterGain,
+    sources: [droneA, droneB, shimmer, lfo, noise]
+  };
+}
+
+// Plays on every sweep cycle — smooth ascending subspace sweep (220 Hz → 1.4 kHz)
+// Classic submarine sonar ping — plays on contact detection
+function playLifeformDetectionChirp(radarState, nowMs) {
+  if (!appSettings.systemSounds) {
+    return;
+  }
+  if (nowMs - radarState.lastPingAt < LIFEFORM_PING_COOLDOWN_MS) {
+    return;
+  }
+
+  const ctx = ensureAudioContext();
+  if (!ctx) {
+    return;
+  }
+  if (ctx.state === "suspended") {
+    ctx.resume().catch(() => {});
+  }
+
+  radarState.lastPingAt = nowMs;
+
+  const start = ctx.currentTime;
+  const freq = 900;
+  const duration = 1.2;
+
+  // Single pure sine — the classic sonar ping tone
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = "sine";
+  osc.frequency.value = freq;
+
+  // Sharp attack, quick sustain, long natural decay (like a struck bell ringing out)
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(0.06, start + 0.005);
+  gain.gain.exponentialRampToValueAtTime(0.04, start + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  // Echo taps to simulate sonar reverb in water/space
+  const echoDelays = [0.18, 0.38, 0.62, 0.9];
+  const echoGains  = [0.28, 0.16, 0.09, 0.04];
+
+  for (let i = 0; i < echoDelays.length; i++) {
+    const delay = ctx.createDelay(1.5);
+    const echoGain = ctx.createGain();
+    delay.delayTime.value = echoDelays[i];
+    echoGain.gain.value = echoGains[i];
+    gain.connect(delay);
+    delay.connect(echoGain);
+    echoGain.connect(ctx.destination);
+  }
+
+  osc.start(start);
+  osc.stop(start + duration);
+}
+
 function speakIfEnabled(text) {
   if (!appSettings.voice) {
     return;
@@ -205,6 +386,11 @@ function clearActiveScan() {
     clearInterval(activeMedicalInterval);
     activeMedicalInterval = null;
   }
+  if (activeMedicalFrame) {
+    cancelAnimationFrame(activeMedicalFrame);
+    activeMedicalFrame = null;
+  }
+  stopMedicalAmbience();
   stopLifeformRadar();
   lifeformScanActive = false;
 }
@@ -326,6 +512,7 @@ const LIFEFORM_EXIT_FADE_STEPS = 2;
 const LIFEFORM_EXIT_FADE_MS_PER_STEP = 900;
 const LIFEFORM_SWEEP_SPEED_DEG_PER_MS = 0.1;
 const LIFEFORM_MOVEMENT_BOOST = 2.8;
+const LIFEFORM_PING_COOLDOWN_MS = 70;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -483,6 +670,7 @@ function renderLifeformRadar(options = {}) {
     angle: 0,
     lastAngle: 0,
     lastTick: performance.now(),
+    lastPingAt: -Infinity,
     scanStartedAt: performance.now(),
     contacts: [],
     currentCount: 0,
@@ -534,6 +722,7 @@ function renderLifeformRadar(options = {}) {
         updateRadarMarkerPosition(contact);
         contact.revealedAt = now;
         contact.marker.style.opacity = "1";
+        playLifeformDetectionChirp(lifeformRadarState, now);
       }
 
       if (contact.revealedAt !== null) {
@@ -557,7 +746,6 @@ function renderLifeformRadar(options = {}) {
 function runLifeformScan() {
   renderLifeformRadar({ animateSweep: true });
   lifeformScanActive = true;
-  playModeSound("lifeform", "start");
   primaryReadout.textContent = "Sweeping for bio-signs...";
   secondaryReadout.textContent = "Rotational sensor sweep active. Press scan again to stop.";
 }
@@ -580,8 +768,6 @@ function stopLifeformScan() {
     secondaryReadout.textContent += ` Movement observed: fluctuated to ${peak}.`;
   }
   statusLabel.textContent = "IDLE";
-
-  playModeSound("lifeform", "complete");
   speakIfEnabled("Lifeform sweep stopped. Latest bio-sign count available on screen.");
 }
 
@@ -615,6 +801,9 @@ function renderSettingsPanel() {
   soundToggle.addEventListener("click", () => {
     appSettings.systemSounds = !appSettings.systemSounds;
     saveSettings();
+    if (!appSettings.systemSounds) {
+      stopMedicalAmbience();
+    }
     playModeSound("settings", "toggle");
     primaryReadout.textContent = `System sounds ${appSettings.systemSounds ? "enabled" : "disabled"}.`;
     renderSettingsPanel();
@@ -631,56 +820,217 @@ function renderSettingsPanel() {
 
 function runMedicalScan() {
   renderMedicalOutline();
-  playModeSound("medical", "start");
+  startMedicalAmbience();
 
+  const board = graphArea.querySelector(".medical-board");
+  const figure = graphArea.querySelector(".medical-figure");
   const scanLine = graphArea.querySelector(".medical-scan-line");
   const scanGlow = graphArea.querySelector(".medical-scan-glow");
   const findings = [];
-  let step = 0;
+  const findingMarkers = [];
+  const stepDurationMs = 320;
+  let phase = "down";
+  let downIndex = 0;
+  let upIndex = -1;
+  let fromY = 8;
+  let toY = MEDICAL_ZONES[0].y;
+  let segmentStart = performance.now();
 
-  activeMedicalInterval = setInterval(() => {
-    if (!scanLine) {
+  let figureMaskCtx = null;
+  let figureMaskWidth = 0;
+  let figureMaskHeight = 0;
+  let boardOffsetX = 0;
+  let boardOffsetY = 0;
+
+  const buildFigureMask = () => {
+    if (!board || !figure || !figure.complete || !figure.naturalWidth || !figure.naturalHeight) {
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.floor(board.clientWidth));
+    canvas.height = Math.max(1, Math.floor(board.clientHeight));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return;
+    }
+
+    const srcW = figure.naturalWidth;
+    const srcH = figure.naturalHeight;
+    const scale = Math.min(canvas.width / srcW, canvas.height / srcH);
+    const drawW = srcW * scale;
+    const drawH = srcH * scale;
+    const drawX = (canvas.width - drawW) / 2;
+    const drawY = (canvas.height - drawH) / 2;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(figure, drawX, drawY, drawW, drawH);
+
+    figureMaskCtx = ctx;
+    figureMaskWidth = canvas.width;
+    figureMaskHeight = canvas.height;
+
+    const graphRect = graphArea.getBoundingClientRect();
+    const boardRect = board.getBoundingClientRect();
+    boardOffsetX = boardRect.left - graphRect.left;
+    boardOffsetY = boardRect.top - graphRect.top;
+  };
+
+  if (figure) {
+    if (figure.complete) {
+      buildFigureMask();
+    } else {
+      figure.addEventListener("load", buildFigureMask, { once: true });
+    }
+  }
+
+  const isOnFigure = (xPct, yPct) => {
+    if (!figureMaskCtx || !figureMaskWidth || !figureMaskHeight) {
+      return true;
+    }
+
+    const xPxInGraph = (xPct / 100) * graphArea.clientWidth;
+    const yPxInGraph = (yPct / 100) * graphArea.clientHeight;
+    const xInBoard = xPxInGraph - boardOffsetX;
+    const yInBoard = yPxInGraph - boardOffsetY;
+
+    if (xInBoard < 0 || yInBoard < 0 || xInBoard >= figureMaskWidth || yInBoard >= figureMaskHeight) {
+      return false;
+    }
+
+    const sampleRadius = 3;
+    for (let dy = -sampleRadius; dy <= sampleRadius; dy++) {
+      for (let dx = -sampleRadius; dx <= sampleRadius; dx++) {
+        const sx = Math.floor(xInBoard + dx);
+        const sy = Math.floor(yInBoard + dy);
+        if (sx < 0 || sy < 0 || sx >= figureMaskWidth || sy >= figureMaskHeight) {
+          continue;
+        }
+        const alpha = figureMaskCtx.getImageData(sx, sy, 1, 1).data[3];
+        if (alpha > 8) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  };
+
+  const pickMarkerPosition = zone => {
+    for (let i = 0; i < 50; i++) {
+      const x = randomInt(zone.xMin, zone.xMax);
+      const y = zone.y + (Math.random() * 1.6 - 0.8);
+      if (isOnFigure(x, y)) {
+        return { x, y };
+      }
+    }
+
+    // Fallback keeps dots near centerline if the figure mask is unavailable.
+    return {
+      x: Math.round((zone.xMin + zone.xMax) / 2),
+      y: zone.y
+    };
+  };
+
+  const evaluateZone = zone => {
+    const issueDetected = Math.random() > 0.35;
+    if (!issueDetected) {
+      return;
+    }
+
+    const issue = zone.issues[randomInt(0, zone.issues.length - 1)];
+    if (issue === "no anomalies") {
+      return;
+    }
+
+    const severity = Math.random() > 0.72 ? "high" : "low";
+    findings.push(`${zone.name}: ${issue} (${severity})`);
+    const markerPosition = pickMarkerPosition(zone);
+
+    const marker = document.createElement("div");
+    marker.className = `medical-issue-marker ${severity}`;
+    marker.style.top = `${markerPosition.y}%`;
+    marker.style.left = `${markerPosition.x}%`;
+    graphArea.appendChild(marker);
+    findingMarkers.push({
+      y: markerPosition.y,
+      marker,
+      affirmed: false
+    });
+  };
+
+  const affirmMarkersNear = y => {
+    findingMarkers.forEach(item => {
+      if (item.affirmed || Math.abs(item.y - y) > 1.5) {
+        return;
+      }
+      item.affirmed = true;
+      item.marker.classList.add("confirmed");
+    });
+  };
+
+  const tick = now => {
+    if (!scanLine || !scanGlow) {
       clearActiveScan();
       return;
     }
 
-    const zone = MEDICAL_ZONES[step];
-    scanLine.style.top = `${zone.y}%`;
-    scanGlow.style.top = `${zone.y - 5}%`;
-    primaryReadout.textContent = `Scanning ${zone.name} region...`;
+    const progress = Math.min(1, (now - segmentStart) / stepDurationMs);
+    const y = fromY + (toY - fromY) * progress;
+    scanLine.style.top = `${y}%`;
+    scanGlow.style.top = `${y - 5}%`;
 
-    const issueDetected = Math.random() > 0.35;
-    if (issueDetected) {
-      const issue = zone.issues[randomInt(0, zone.issues.length - 1)];
-      if (issue !== "no anomalies") {
-        const severity = Math.random() > 0.72 ? "high" : "low";
-        findings.push(`${zone.name}: ${issue} (${severity})`);
-
-        const marker = document.createElement("div");
-        marker.className = `medical-issue-marker ${severity}`;
-        marker.style.top = `${zone.y}%`;
-        marker.style.left = `${randomInt(zone.xMin, zone.xMax)}%`;
-        graphArea.appendChild(marker);
-      }
+    if (phase === "down") {
+      primaryReadout.textContent = `Scanning ${MEDICAL_ZONES[Math.min(downIndex, MEDICAL_ZONES.length - 1)].name} region...`;
+    } else {
+      const labelIndex = upIndex >= 0 ? upIndex : 0;
+      primaryReadout.textContent = `Confirming ${MEDICAL_ZONES[labelIndex].name} findings...`;
+      affirmMarkersNear(y);
     }
 
-    step += 1;
-    if (step >= MEDICAL_ZONES.length) {
-      clearActiveScan();
-      statusLabel.textContent = "COMPLETE";
+    if (progress >= 1) {
+      if (phase === "down") {
+        const zone = MEDICAL_ZONES[downIndex];
+        evaluateZone(zone);
+        downIndex += 1;
 
-      if (findings.length > 0) {
-        primaryReadout.textContent = `Medical findings: ${findings.length} concern(s).`;
-        secondaryReadout.textContent = findings.join(" | ");
+        if (downIndex >= MEDICAL_ZONES.length) {
+          phase = "up";
+          upIndex = MEDICAL_ZONES.length - 2;
+          fromY = toY;
+          toY = upIndex >= 0 ? MEDICAL_ZONES[upIndex].y : 8;
+          segmentStart = now;
+        } else {
+          fromY = toY;
+          toY = MEDICAL_ZONES[downIndex].y;
+          segmentStart = now;
+        }
+      } else if (upIndex >= 0) {
+        fromY = toY;
+        upIndex -= 1;
+        toY = upIndex >= 0 ? MEDICAL_ZONES[upIndex].y : 8;
+        segmentStart = now;
       } else {
-        primaryReadout.textContent = "Medical findings: no significant anomalies.";
-        secondaryReadout.textContent = "Vitals stable from cranial to pedal scan bands.";
-      }
+        clearActiveScan();
+        statusLabel.textContent = "COMPLETE";
 
-      playModeSound("medical", "complete");
-      speakIfEnabled("Medical scan complete. " + primaryReadout.textContent);
+        if (findings.length > 0) {
+          primaryReadout.textContent = `Medical findings: ${findings.length} concern(s) confirmed.`;
+          secondaryReadout.textContent = findings.join(" | ");
+        } else {
+          primaryReadout.textContent = "Medical findings: no significant anomalies.";
+          secondaryReadout.textContent = "Vitals stable from cranial to pedal scan bands.";
+        }
+
+        speakIfEnabled("Medical scan complete. " + primaryReadout.textContent);
+        return;
+      }
     }
-  }, 320);
+
+    activeMedicalFrame = requestAnimationFrame(tick);
+  };
+
+  activeMedicalFrame = requestAnimationFrame(tick);
 }
 
 function performScan() {
