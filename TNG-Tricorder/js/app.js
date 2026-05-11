@@ -300,44 +300,7 @@ function renderMedicalOutline() {
   const figureWrap = document.createElement("div");
   figureWrap.className = "medical-figure-wrap";
   figureWrap.innerHTML = `
-    <svg class="medical-figure" viewBox="0 0 120 240" aria-hidden="true">
-      <!-- Head -->
-      <circle cx="60" cy="30" r="14" class="medical-outline" />
-
-      <!-- Neck -->
-      <line x1="60" y1="44" x2="60" y2="56" class="medical-outline" />
-
-      <!-- Shoulders + Torso -->
-      <path d="
-        M 30 56
-        L 90 56
-        M 60 56
-        L 60 140
-      " class="medical-outline" />
-
-      <!-- Arms -->
-      <path d="
-        M 30 56
-        L 24 100
-        L 24 140
-        M 90 56
-        L 96 100
-        L 96 140
-      " class="medical-outline" />
-
-      <!-- Hips -->
-      <line x1="44" y1="140" x2="76" y2="140" class="medical-outline" />
-
-      <!-- Legs -->
-      <path d="
-        M 44 140
-        L 44 200
-        L 52 228
-        M 76 140
-        L 76 200
-        L 68 228
-      " class="medical-outline" />
-    </svg>
+    <img class="medical-figure" src="person.svg" alt="Medical figure" aria-hidden="true" />
   `;
 
   const scanGlow = document.createElement("div");
