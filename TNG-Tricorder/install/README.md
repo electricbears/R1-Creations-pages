@@ -12,7 +12,7 @@ These files are used to install the creation on Rabbit R1 via "Add via QR code".
 
 ## Current Hosted URL
 
-`https://electricbears.github.io/R1-Creations-pages/`
+`https://electricbears.github.io/R1-Creations-pages/TNG-Tricorder/`
 
 ## Publish the Site
 

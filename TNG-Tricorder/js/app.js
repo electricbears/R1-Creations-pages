@@ -225,25 +225,25 @@ function startMedicalAmbience() {
   const now = ctx.currentTime;
   const masterGain = ctx.createGain();
   masterGain.gain.setValueAtTime(0.0001, now);
-  masterGain.gain.exponentialRampToValueAtTime(0.034, now + 0.8);
+  masterGain.gain.exponentialRampToValueAtTime(0.08, now + 0.45);
 
   const droneA = ctx.createOscillator();
   const droneAGain = ctx.createGain();
   droneA.type = "sine";
   droneA.frequency.value = 136;
-  droneAGain.gain.value = 0.45;
+  droneAGain.gain.value = 0.72;
 
   const droneB = ctx.createOscillator();
   const droneBGain = ctx.createGain();
   droneB.type = "triangle";
   droneB.frequency.value = 204;
-  droneBGain.gain.value = 0.2;
+  droneBGain.gain.value = 0.34;
 
   const shimmer = ctx.createOscillator();
   const shimmerGain = ctx.createGain();
   shimmer.type = "sine";
   shimmer.frequency.value = 980;
-  shimmerGain.gain.value = 0.02;
+  shimmerGain.gain.value = 0.045;
 
   const lfo = ctx.createOscillator();
   const lfoGainA = ctx.createGain();
@@ -275,7 +275,7 @@ function startMedicalAmbience() {
   noiseLowpass.frequency.value = 2100;
 
   const noiseGain = ctx.createGain();
-  noiseGain.gain.value = 0.07;
+  noiseGain.gain.value = 0.12;
 
   lfo.connect(lfoGainA);
   lfo.connect(lfoGainB);
