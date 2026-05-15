@@ -198,6 +198,65 @@ button:focus-visible {
   outline-offset: 1px;
 }
 
+.launcher-top {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.back-button {
+  background: linear-gradient(180deg, #ffbf69, #ff9d4d);
+  border: 0;
+  border-radius: 6px;
+  color: #071426;
+  font-size: 9px;
+  font-weight: bold;
+  padding: 4px 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.back-button:hover {
+  opacity: 0.9;
+}
+
+.header-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.view {
+  display: none;
+}
+
+.view.active {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+}
+
+.iframe-container {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #121827;
+}
+
+iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
 @media (max-width: 420px) {
   body {
     align-items: flex-start;

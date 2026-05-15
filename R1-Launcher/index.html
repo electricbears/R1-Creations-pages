@@ -9,32 +9,43 @@
 <body>
   <div id="app" class="launcher-shell">
     <header class="launcher-top">
-      <div class="app-title">R1 LAUNCHER</div>
-      <div class="app-subtitle">APP HUB</div>
+      <button id="back-btn" class="back-button" style="display: none;" aria-label="Back to launcher">← BACK</button>
+      <div id="header-content" class="header-content">
+        <div class="app-title">R1 LAUNCHER</div>
+        <div class="app-subtitle">APP HUB</div>
+      </div>
     </header>
 
     <main class="launcher-main">
-      <section class="card launch-target" aria-live="polite">
-        <div class="card-label">Selected</div>
-        <div id="target-name" class="target-name">TNG Tricorder</div>
-        <div id="target-type" class="target-type">Custom Creation</div>
-        <div id="target-description" class="target-description">
-          Launch a local creation hosted in this repository.
-        </div>
-      </section>
+      <div id="selector-view" class="view active">
+        <section class="card launch-target" aria-live="polite">
+          <div class="card-label">Selected</div>
+          <div id="target-name" class="target-name">TNG Tricorder</div>
+          <div id="target-type" class="target-type">Custom Creation</div>
+          <div id="target-description" class="target-description">
+            Launch a local creation hosted in this repository.
+          </div>
+        </section>
 
-      <section class="card launch-list">
-        <div class="card-label">Catalog</div>
-        <div id="launch-items" class="launch-items" role="listbox" aria-label="Launch targets"></div>
-      </section>
+        <section class="card launch-list">
+          <div class="card-label">Catalog</div>
+          <div id="launch-items" class="launch-items" role="listbox" aria-label="Launch targets"></div>
+        </section>
 
-      <section class="card launch-status" aria-live="polite">
-        <div class="card-label">Status</div>
-        <div id="status-primary" class="status-primary">Ready</div>
-        <div id="status-secondary" class="status-secondary">
-          Rotate wheel to choose. Press side button to launch.
+        <section class="card launch-status" aria-live="polite">
+          <div class="card-label">Status</div>
+          <div id="status-primary" class="status-primary">Ready</div>
+          <div id="status-secondary" class="status-secondary">
+            Rotate wheel to choose. Press side button to launch.
+          </div>
+        </section>
+      </div>
+
+      <div id="viewing-view" class="view">
+        <div id="iframe-container" class="iframe-container">
+          <iframe id="target-iframe" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals"></iframe>
         </div>
-      </section>
+      </div>
     </main>
 
     <footer class="launcher-bottom">

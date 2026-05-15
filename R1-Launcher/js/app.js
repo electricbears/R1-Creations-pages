@@ -122,16 +122,46 @@ function launchCurrentTarget() {
   statusSecondary.textContent = `${target.name} (${target.kind})`;
 
   if (target.launchMode === "web") {
-    launchWebTarget(target.launchUrl);
+    launchInIframe(target.launchUrl);
     return;
   }
 
   launchViaBridge(target);
 }
 
+function showView(viewName) {
+  document.getElementById('selector-view').classList.remove('active');
+  document.getElementById('viewing-view').classList.remove('active');
+  document.getElementById(viewName).classList.add('active');
+  
+  const backBtn = document.getElementById('back-btn');
+  if (viewName === 'viewing-view') {
+    backBtn.style.display = 'block';
+  } else {
+    backBtn.style.display = 'none';
+  }
+}
+
+function launchInIframe(url) {
+  const iframe = document.getElementById('target-iframe');
+  iframe.src = url;
+  showView('viewing-view');
+  statusPrimary.textContent = 'Viewing';
+  statusSecondary.textContent = 'Loading target...';
+}
+
+function goBack() {
+  const iframe = document.getElementById('target-iframe');
+  iframe.src = '';
+  showView('selector-view');
+  render();
+}
+
 window.launcher = {
   cycleTarget,
   launchCurrentTarget
 };
+
+document.getElementById('back-btn').addEventListener('click', goBack);
 
 render();
