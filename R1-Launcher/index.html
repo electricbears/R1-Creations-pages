@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>R1 Launcher</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app" class="launcher-shell">
+    <header class="launcher-top">
+      <div class="app-title">R1 LAUNCHER</div>
+      <div class="app-subtitle">APP HUB</div>
+    </header>
+
+    <main class="launcher-main">
+      <section class="card launch-target" aria-live="polite">
+        <div class="card-label">Selected</div>
+        <div id="target-name" class="target-name">TNG Tricorder</div>
+        <div id="target-type" class="target-type">Custom Creation</div>
+        <div id="target-description" class="target-description">
+          Launch a local creation hosted in this repository.
+        </div>
+      </section>
+
+      <section class="card launch-list">
+        <div class="card-label">Catalog</div>
+        <div id="launch-items" class="launch-items" role="listbox" aria-label="Launch targets"></div>
+      </section>
+
+      <section class="card launch-status" aria-live="polite">
+        <div class="card-label">Status</div>
+        <div id="status-primary" class="status-primary">Ready</div>
+        <div id="status-secondary" class="status-secondary">
+          Rotate wheel to choose. Press side button to launch.
+        </div>
+      </section>
+    </main>
+
+    <footer class="launcher-bottom">
+      <span id="index-label">1/5</span>
+      <span id="type-label">custom</span>
+    </footer>
+  </div>
+
+  <script src="js/hardware.js"></script>
+  <script src="js/speak.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
