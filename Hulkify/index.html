@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hulkify</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <video id="viewfinder" autoplay playsinline muted></video>
+    <canvas id="capture-canvas" aria-hidden="true"></canvas>
+
+    <div class="overlay top">
+      <span class="badge">HULKIFY</span>
+      <span id="camera-label" class="badge">BACK CAM</span>
+    </div>
+
+    <div class="overlay bottom">
+      <div id="status">Starting camera...</div>
+      <div class="hint">Wheel: switch cam | Side: take + Hulkify</div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

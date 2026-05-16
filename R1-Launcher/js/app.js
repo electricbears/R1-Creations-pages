@@ -39,6 +39,16 @@ const TARGETS = [
     embedInIframe: true
   },
   {
+    id: "hulkify",
+    name: "Hulkify",
+    kind: "custom",
+    typeLabel: "Camera Creation",
+    description: "Camera viewfinder that captures and sends a Hulk-style magic photo prompt.",
+    launchUrl: "https://electricbears.github.io/R1-Creations-pages/Hulkify/",
+    launchMode: "web",
+    embedInIframe: true
+  },
+  {
     id: "plex",
     name: "Plex",
     kind: "external",

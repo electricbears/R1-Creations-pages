@@ -1,0 +1,1 @@
+https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&data=%7B%22title%22%3A%22Hulkify%22%2C%22url%22%3A%22https%3A%2F%2Felectricbears.github.io%2FR1-Creations-pages%2FHulkify%2F%22%2C%22description%22%3A%22Capture%20a%20photo%20and%20Hulkify%20it%20with%20a%20magic%20photo%20prompt.%22%2C%22iconUrl%22%3A%22%22%2C%22themeColor%22%3A%22%2384FF84%22%7D
