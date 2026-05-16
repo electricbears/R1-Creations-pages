@@ -63,11 +63,15 @@ function relayNativeScroll(direction) {
 function cycleFromScroll(direction) {
   const viewingView = document.getElementById('viewing-view');
   const isViewing = viewingView && viewingView.classList.contains('active');
+  const settingsView = document.getElementById('settings-view');
+  const isSettings = settingsView && settingsView.classList.contains('active');
   
   if (isViewing) {
     const eventName = direction > 0 ? "scrollDown" : "scrollUp";
     relayHardwareEventToIframe(eventName);
     relayNativeScroll(direction);
+  } else if (isSettings && window.launcher) {
+    window.launcher.cycleSettingsOption(direction);
   } else if (window.launcher) {
     window.launcher.cycleTarget(direction);
   }
@@ -82,12 +86,26 @@ function launchFromSideClick() {
   
   const viewingView = document.getElementById('viewing-view');
   const isViewing = viewingView && viewingView.classList.contains('active');
+  const settingsView = document.getElementById('settings-view');
+  const isSettings = settingsView && settingsView.classList.contains('active');
   
   if (isViewing && isDoubleClick) {
     // Double click returns to main screen
     if (window.launcher) {
       window.launcher.goBack();
     }
+    return;
+  }
+
+  if (isSettings && isDoubleClick) {
+    if (window.launcher) {
+      window.launcher.goBack();
+    }
+    return;
+  }
+
+  if (isSettings && window.launcher) {
+    window.launcher.toggleSelectedSetting();
     return;
   }
   

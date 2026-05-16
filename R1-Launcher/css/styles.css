@@ -260,6 +260,65 @@ button:focus-visible {
   background: #121827;
 }
 
+.settings-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-help {
+  font-size: 8px;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.settings-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid rgba(126, 169, 223, 0.26);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 5px 6px;
+  font-size: 9px;
+  color: var(--ink);
+}
+
+.settings-item.active {
+  border-color: rgba(94, 225, 255, 0.75);
+  background: rgba(94, 225, 255, 0.16);
+}
+
+.settings-item-name {
+  color: #dce8ff;
+}
+
+.settings-item-value {
+  font-size: 8px;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  color: var(--ok);
+}
+
+.settings-item-value.off {
+  color: var(--muted);
+}
+
+.settings-hint {
+  min-height: 18px;
+  font-size: 8px;
+  line-height: 1.25;
+  color: #d2dbef;
+}
+
 iframe {
   width: 100%;
   height: 100%;

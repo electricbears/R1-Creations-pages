@@ -46,6 +46,15 @@
           <iframe id="target-iframe" tabindex="-1" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals"></iframe>
         </div>
       </div>
+
+      <div id="settings-view" class="view">
+        <section class="card settings-panel" aria-live="polite">
+          <div class="card-label">Launcher Settings</div>
+          <div class="settings-help">Wheel: choose setting. Side: toggle. Double side: back.</div>
+          <div id="settings-items" class="settings-items" role="listbox" aria-label="Launcher settings"></div>
+          <div id="settings-hint" class="settings-hint">All settings default to ON.</div>
+        </section>
+      </div>
     </main>
 
     <footer class="launcher-bottom">
