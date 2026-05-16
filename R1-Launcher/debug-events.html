@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>R1 Launcher Event Debug</title>
+  <style>
+    :root {
+      --bg: #070b12;
+      --panel: #10192b;
+      --ink: #eaf1ff;
+      --muted: #93a6c3;
+      --accent: #4dd0ff;
+      --warn: #ffbf69;
+      --ok: #70e8a4;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 20% 10%, rgba(77, 208, 255, 0.15), transparent 40%), var(--bg);
+      color: var(--ink);
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      min-height: 100vh;
+      padding: 8px;
+    }
+
+    .shell {
+      width: min(820px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 8px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid rgba(125, 170, 230, 0.35);
+      border-radius: 10px;
+      padding: 8px;
+    }
+
+    .title {
+      font-size: 14px;
+      color: var(--accent);
+      margin-bottom: 6px;
+      letter-spacing: 0.04em;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .controls select,
+    .controls button {
+      border: 0;
+      border-radius: 7px;
+      padding: 7px 9px;
+      font-size: 12px;
+    }
+
+    .controls select {
+      background: #0d1423;
+      color: var(--ink);
+      border: 1px solid rgba(125, 170, 230, 0.3);
+    }
+
+    .controls button {
+      background: linear-gradient(180deg, #7fe5ff, #4dd0ff);
+      color: #082136;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .controls button.warn {
+      background: linear-gradient(180deg, #ffd7a5, #ffbf69);
+      color: #3a250a;
+    }
+
+    .controls button.ghost {
+      background: #18243b;
+      color: var(--ink);
+      border: 1px solid rgba(125, 170, 230, 0.25);
+    }
+
+    .meta {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .viewport {
+      width: 240px;
+      height: 282px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid rgba(125, 170, 230, 0.3);
+      background: #0f1625;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+      background: #111a2d;
+    }
+
+    .log {
+      background: #0a1220;
+      border-radius: 8px;
+      border: 1px solid rgba(125, 170, 230, 0.2);
+      height: 280px;
+      overflow: auto;
+      padding: 6px;
+      font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+    }
+
+    .ok { color: var(--ok); }
+    .warn-text { color: var(--warn); }
+    .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="card">
+      <div class="title">R1 Event Relay Debug</div>
+      <div class="controls">
+        <select id="target-select">
+          <option value="https://electricbears.github.io/R1-Creations-pages/TNG-Tricorder/">TNG Tricorder</option>
+          <option value="https://www.home-assistant.io/">Home Assistant</option>
+        </select>
+        <button id="open-btn">Open Target</button>
+        <button id="close-btn" class="warn">Close Target</button>
+        <button id="clear-log-btn" class="ghost">Clear Log</button>
+      </div>
+      <div class="controls" style="margin-top: 6px;">
+        <button id="send-scroll-up" class="ghost">Send scrollUp</button>
+        <button id="send-scroll-down" class="ghost">Send scrollDown</button>
+        <button id="send-side-click" class="ghost">Send sideClick</button>
+      </div>
+      <div class="meta">
+        Logs include: incoming R1 events, iframe load/focus state, same-origin dispatch outcome,
+        postMessage fallback, and TouchEventHandler injection attempts.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">Iframe Viewport (240x282)</div>
+      <div class="viewport">
+        <iframe id="debug-iframe" tabindex="-1" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals"></iframe>
+      </div>
+      <div class="meta" id="iframe-status">Iframe idle</div>
+    </div>
+
+    <div class="card">
+      <div class="title">Event Log</div>
+      <div id="log" class="log"></div>
+    </div>
+  </div>
+
+  <script>
+    const iframe = document.getElementById("debug-iframe");
+    const targetSelect = document.getElementById("target-select");
+    const iframeStatus = document.getElementById("iframe-status");
+    const logEl = document.getElementById("log");
+
+    function ts() {
+      const d = new Date();
+      return d.toISOString().slice(11, 23);
+    }
+
+    function log(message, klass) {
+      const line = `[${ts()}] ${message}`;
+      const span = document.createElement("div");
+      if (klass) {
+        span.className = klass;
+      }
+      span.textContent = line;
+      logEl.appendChild(span);
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(line);
+    }
+
+    function iframeLoaded() {
+      return Boolean(iframe.src && iframe.src !== "about:blank");
+    }
+
+    function canAccessIframeWindow() {
+      try {
+        void iframe.contentWindow.document;
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    }
+
+    function updateStatus() {
+      if (!iframeLoaded()) {
+        iframeStatus.textContent = "Iframe idle";
+        return;
+      }
+      const sameOrigin = canAccessIframeWindow();
+      iframeStatus.textContent = `Loaded: ${iframe.src} | Same-origin access: ${sameOrigin ? "yes" : "no"}`;
+    }
+
+    function openTarget() {
+      const url = targetSelect.value;
+      iframe.src = url;
+      log(`open target: ${url}`, "ok");
+      updateStatus();
+    }
+
+    function closeTarget() {
+      iframe.src = "about:blank";
+      log("close target", "warn-text");
+      updateStatus();
+    }
+
+    function sendTouch(type, x, y) {
+      if (typeof TouchEventHandler === "undefined") {
+        log(`touch ${type} skipped: TouchEventHandler unavailable`, "warn-text");
+        return;
+      }
+      try {
+        TouchEventHandler.postMessage(JSON.stringify({ type, x, y }));
+        log(`touch ${type} sent (${x},${y})`);
+      } catch (error) {
+        log(`touch ${type} failed: ${String(error)}`, "warn-text");
+      }
+    }
+
+    function relayEvent(eventName) {
+      if (!iframeLoaded()) {
+        log(`relay ${eventName} skipped: iframe not loaded`, "warn-text");
+        return;
+      }
+
+      iframe.focus();
+      iframe.contentWindow.focus();
+      log(`relay ${eventName}: focus handed to iframe`);
+
+      if (canAccessIframeWindow()) {
+        try {
+          iframe.contentWindow.dispatchEvent(new Event(eventName));
+          log(`relay ${eventName}: same-origin dispatch OK`, "ok");
+        } catch (error) {
+          log(`relay ${eventName}: same-origin dispatch FAILED: ${String(error)}`, "warn-text");
+        }
+      } else {
+        try {
+          iframe.contentWindow.postMessage({ type: "hardware-event", event: eventName }, "*");
+          log(`relay ${eventName}: postMessage fallback sent`);
+        } catch (error) {
+          log(`relay ${eventName}: postMessage FAILED: ${String(error)}`, "warn-text");
+        }
+      }
+
+      if (eventName === "sideClick") {
+        sendTouch("tap", 120, 141);
+      } else if (eventName === "scrollUp" || eventName === "scrollDown") {
+        const dir = eventName === "scrollDown" ? 1 : -1;
+        const x = 120;
+        const yStart = 150;
+        const yEnd = dir > 0 ? 130 : 170;
+        sendTouch("down", x, yStart);
+        sendTouch("move", x, yEnd);
+        sendTouch("up", x, yEnd);
+      }
+    }
+
+    iframe.addEventListener("load", () => {
+      log("iframe load event", "ok");
+      updateStatus();
+    });
+
+    iframe.addEventListener("error", () => {
+      log("iframe error event", "warn-text");
+      updateStatus();
+    });
+
+    window.addEventListener("message", event => {
+      const src = event.source === iframe.contentWindow ? "iframe" : "other";
+      log(`window message from ${src}: ${JSON.stringify(event.data)}`);
+    });
+
+    ["scrollUp", "scrollDown", "sideClick", "longPressStart", "longPressEnd"].forEach(eventName => {
+      window.addEventListener(eventName, () => {
+        log(`incoming hardware event: ${eventName}`, "ok");
+        relayEvent(eventName);
+      });
+    });
+
+    window.addEventListener("keydown", event => {
+      if (event.key === "ArrowUp") {
+        log("debug keydown ArrowUp -> relay scrollUp");
+        relayEvent("scrollUp");
+      } else if (event.key === "ArrowDown") {
+        log("debug keydown ArrowDown -> relay scrollDown");
+        relayEvent("scrollDown");
+      } else if (event.key === "Enter") {
+        log("debug keydown Enter -> relay sideClick");
+        relayEvent("sideClick");
+      }
+    });
+
+    document.getElementById("open-btn").addEventListener("click", openTarget);
+    document.getElementById("close-btn").addEventListener("click", closeTarget);
+    document.getElementById("clear-log-btn").addEventListener("click", () => {
+      logEl.innerHTML = "";
+      log("log cleared", "muted");
+    });
+
+    document.getElementById("send-scroll-up").addEventListener("click", () => relayEvent("scrollUp"));
+    document.getElementById("send-scroll-down").addEventListener("click", () => relayEvent("scrollDown"));
+    document.getElementById("send-side-click").addEventListener("click", () => relayEvent("sideClick"));
+
+    log("debug page ready", "ok");
+    updateStatus();
+  </script>
+</body>
+</html>
