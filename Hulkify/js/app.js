@@ -18,8 +18,13 @@ let stream = null;
 let busy = false;
 let cameraReady = false;
 let cameras = [];
+let cameraStarted = false;
+let startingCamera = false;
 
 const appEl = document.getElementById("app");
+const startScreenEl = document.getElementById("start-screen");
+const startTextEl = document.getElementById("start-text");
+const startButtonEl = document.getElementById("start-button");
 const videoEl = document.getElementById("viewfinder");
 const canvasEl = document.getElementById("capture-canvas");
 const cameraLabelEl = document.getElementById("camera-label");
@@ -28,6 +33,32 @@ const statusEl = document.getElementById("status");
 function setStatus(message, isError) {
   statusEl.textContent = message;
   statusEl.classList.toggle("error", Boolean(isError));
+}
+
+function setStartText(message) {
+  if (startTextEl) {
+    startTextEl.textContent = message;
+  }
+}
+
+function setStartButtonBusy(isBusy) {
+  if (startButtonEl) {
+    startButtonEl.disabled = isBusy;
+  }
+}
+
+function showCameraUi() {
+  if (startScreenEl) {
+    startScreenEl.style.display = "none";
+  }
+  videoEl.style.display = "block";
+}
+
+function showStartUi() {
+  if (startScreenEl) {
+    startScreenEl.style.display = "flex";
+  }
+  videoEl.style.display = "none";
 }
 
 function getCameraFacingMode() {
@@ -171,16 +202,24 @@ function waitForVideoReady() {
 }
 
 async function startCamera() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    setStatus("Camera API unavailable.", true);
+  if (startingCamera) {
     return;
   }
 
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setStatus("Camera API unavailable.", true);
+    setStartText("Camera API unavailable in this runtime.");
+    return;
+  }
+
+  startingCamera = true;
   stopStream();
   cameraReady = false;
   await refreshAvailableCameras();
   renderCameraLabel();
   setStatus("Starting camera...", false);
+  setStartText("Requesting camera access...");
+  setStartButtonBusy(true);
 
   try {
     stream = await navigator.mediaDevices.getUserMedia(buildCameraConstraints());
@@ -202,13 +241,19 @@ async function startCamera() {
     await refreshAvailableCameras();
     renderCameraLabel();
     cameraReady = true;
+    cameraStarted = true;
+    showCameraUi();
     setStatus("Ready. Press side button to capture.", false);
   } catch (error) {
     const message = error && error.name === "NotAllowedError"
       ? "Camera permission blocked."
       : "Camera start failed.";
     setStatus(message, true);
+    setStartText(message === "Camera permission blocked." ? "Camera access denied." : "Camera failed to start.");
     console.error("Failed to start camera", error);
+  } finally {
+    startingCamera = false;
+    setStartButtonBusy(false);
   }
 }
 
@@ -265,6 +310,11 @@ function postToMagicPhoto(imageDataUrl) {
 }
 
 async function takePhotoAndSubmit() {
+  if (!cameraStarted) {
+    await startCamera();
+    return;
+  }
+
   if (busy) {
     return;
   }
@@ -297,15 +347,24 @@ window.addEventListener("sideClick", () => takePhotoAndSubmit());
 
 window.addEventListener("keydown", event => {
   if (event.key === "ArrowUp") {
-    switchCamera(-1);
+    if (cameraStarted) {
+      switchCamera(-1);
+    }
   } else if (event.key === "ArrowDown") {
-    switchCamera(1);
+    if (cameraStarted) {
+      switchCamera(1);
+    }
   } else if (event.key === "Enter") {
     takePhotoAndSubmit();
   }
 });
 
+startButtonEl.addEventListener("click", () => {
+  startCamera();
+});
+
 window.addEventListener("beforeunload", stopStream);
 
 renderCameraLabel();
-startCamera();
+showStartUi();
+setStatus("Waiting for camera start...", false);
