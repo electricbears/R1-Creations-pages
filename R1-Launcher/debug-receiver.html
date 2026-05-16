@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>R1 Debug Receiver</title>
+  <style>
+    :root {
+      --bg: #060b12;
+      --panel: #0f1828;
+      --ink: #e8f1ff;
+      --muted: #91a6c5;
+      --accent: #4dd0ff;
+      --ok: #78ecab;
+      --warn: #ffbf69;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 20% 10%, rgba(77, 208, 255, 0.14), transparent 42%), var(--bg);
+      color: var(--ink);
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      padding: 6px;
+      width: 240px;
+      height: 282px;
+      overflow: hidden;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid rgba(125, 170, 230, 0.35);
+      border-radius: 8px;
+      padding: 6px;
+    }
+    .title { color: var(--accent); font-size: 11px; letter-spacing: 0.06em; }
+    .subtitle { color: var(--muted); font-size: 8px; margin-bottom: 4px; }
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin-bottom: 6px;
+    }
+    .stat {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(125, 170, 230, 0.25);
+      border-radius: 6px;
+      padding: 4px;
+      font-size: 8px;
+      line-height: 1.2;
+    }
+    .label { color: var(--muted); }
+    .value { color: var(--ok); font-size: 10px; }
+    .log {
+      height: 152px;
+      overflow: auto;
+      background: #0a1220;
+      border: 1px solid rgba(125, 170, 230, 0.25);
+      border-radius: 6px;
+      padding: 4px;
+      font: 8px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+    }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="title">DEBUG RECEIVER</div>
+    <div class="subtitle">Listening for all incoming events</div>
+
+    <div class="stats">
+      <div class="stat"><div class="label">scrollUp</div><div id="count-scrollUp" class="value">0</div></div>
+      <div class="stat"><div class="label">scrollDown</div><div id="count-scrollDown" class="value">0</div></div>
+      <div class="stat"><div class="label">sideClick</div><div id="count-sideClick" class="value">0</div></div>
+      <div class="stat"><div class="label">postMessage</div><div id="count-message" class="value">0</div></div>
+    </div>
+
+    <div id="log" class="log"></div>
+  </div>
+
+  <script>
+    const counts = {
+      scrollUp: 0,
+      scrollDown: 0,
+      sideClick: 0,
+      message: 0,
+      wheel: 0,
+      click: 0,
+      touchstart: 0,
+      touchmove: 0,
+      touchend: 0,
+      mousedown: 0,
+      mouseup: 0,
+      longPressStart: 0,
+      longPressEnd: 0
+    };
+
+    function ts() {
+      const d = new Date();
+      return d.toISOString().slice(11, 23);
+    }
+
+    function bump(name) {
+      if (!(name in counts)) {
+        counts[name] = 0;
+      }
+      counts[name] += 1;
+      const id = "count-" + name;
+      const el = document.getElementById(id);
+      if (el) {
+        el.textContent = String(counts[name]);
+      }
+    }
+
+    function log(message, klass) {
+      const el = document.getElementById("log");
+      const row = document.createElement("div");
+      if (klass) {
+        row.className = klass;
+      }
+      row.textContent = `[${ts()}] ${message}`;
+      el.appendChild(row);
+      el.scrollTop = el.scrollHeight;
+      console.log(row.textContent);
+    }
+
+    [
+      "scrollUp",
+      "scrollDown",
+      "sideClick",
+      "longPressStart",
+      "longPressEnd",
+      "wheel",
+      "click",
+      "mousedown",
+      "mouseup",
+      "touchstart",
+      "touchmove",
+      "touchend"
+    ].forEach(name => {
+      window.addEventListener(name, evt => {
+        bump(name);
+        const extra = name === "wheel" ? ` deltaY=${evt.deltaY}` : "";
+        log(`${name}${extra}`, "ok");
+      }, { passive: false });
+    });
+
+    window.addEventListener("message", evt => {
+      bump("message");
+      let data = "";
+      try {
+        data = JSON.stringify(evt.data);
+      } catch (_err) {
+        data = String(evt.data);
+      }
+      log(`message ${data}`, "warn");
+
+      if (evt.data && evt.data.type === "hardware-event" && evt.data.event) {
+        const relayName = evt.data.event;
+        log(`dispatching relayed ${relayName}`, "ok");
+        window.dispatchEvent(new Event(relayName));
+      }
+
+      if (evt.data && evt.data.type === "launcher-native-input") {
+        if (evt.data.inputType === "wheel") {
+          const deltaY = evt.data.direction > 0 ? 120 : -120;
+          window.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY }));
+        } else if (evt.data.inputType === "click") {
+          window.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+        }
+      }
+    });
+
+    log("debug receiver ready", "ok");
+  </script>
+</body>
+</html>

@@ -1,5 +1,15 @@
 const TARGETS = [
   {
+    id: "debug-receiver",
+    name: "Debug Receiver",
+    kind: "debug",
+    typeLabel: "Event Debug",
+    description: "Shows all incoming hardware, mouse, wheel, touch, and message events.",
+    launchUrl: "https://electricbears.github.io/R1-Creations-pages/R1-Launcher/debug-receiver.html",
+    launchMode: "web",
+    embedInIframe: true
+  },
+  {
     id: "tricorder",
     name: "TNG Tricorder",
     kind: "custom",
