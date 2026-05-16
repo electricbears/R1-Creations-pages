@@ -1,9 +1,23 @@
 const PROMPT = "Take this image in a Hulk style";
 const CAMERA_ORDER = ["environment", "user"];
+const CAMERA_PROFILES = {
+  environment: {
+    width: 1280,
+    height: 720,
+    label: "BACK CAM"
+  },
+  user: {
+    width: 1280,
+    height: 720,
+    label: "FRONT CAM"
+  }
+};
 
 let cameraIndex = 0;
 let stream = null;
 let busy = false;
+let cameraReady = false;
+let cameras = [];
 
 const appEl = document.getElementById("app");
 const videoEl = document.getElementById("viewfinder");
@@ -21,10 +35,93 @@ function getCameraFacingMode() {
 }
 
 function renderCameraLabel() {
-  const facing = getCameraFacingMode();
+  const selectedCamera = cameras[cameraIndex];
+  const facing = selectedCamera && selectedCamera.facingMode
+    ? selectedCamera.facingMode
+    : getCameraFacingMode();
   const isBack = facing === "environment";
   appEl.classList.toggle("back-camera", isBack);
-  cameraLabelEl.textContent = isBack ? "BACK CAM" : "FRONT CAM";
+  cameraLabelEl.textContent = isBack
+    ? CAMERA_PROFILES.environment.label
+    : CAMERA_PROFILES.user.label;
+}
+
+function inferFacingMode(device, index) {
+  if (!device) {
+    return CAMERA_ORDER[index % CAMERA_ORDER.length];
+  }
+
+  if (device.facingMode === "user" || device.facingMode === "environment") {
+    return device.facingMode;
+  }
+
+  const label = (device.label || "").toLowerCase();
+  if (label.includes("front") || label.includes("user") || label.includes("selfie") || label.includes("face")) {
+    return "user";
+  }
+  if (label.includes("back") || label.includes("rear") || label.includes("environment")) {
+    return "environment";
+  }
+
+  return CAMERA_ORDER[index % CAMERA_ORDER.length];
+}
+
+async function refreshAvailableCameras() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+    cameras = [];
+    return cameras;
+  }
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    cameras = devices
+      .filter(device => device.kind === "videoinput")
+      .map((device, index) => ({
+        ...device,
+        facingMode: inferFacingMode(device, index)
+      }));
+
+    if (cameras.length > 0) {
+      cameraIndex = Math.min(cameraIndex, cameras.length - 1);
+    } else {
+      cameraIndex = 0;
+    }
+  } catch (error) {
+    cameras = [];
+    console.error("Error enumerating cameras", error);
+  }
+
+  return cameras;
+}
+
+function buildCameraConstraints() {
+  const selectedCamera = cameras[cameraIndex];
+  const facingMode = selectedCamera && selectedCamera.facingMode
+    ? selectedCamera.facingMode
+    : getCameraFacingMode();
+  const profile = CAMERA_PROFILES[facingMode] || CAMERA_PROFILES.environment;
+
+  if (selectedCamera && selectedCamera.deviceId) {
+    return {
+      video: {
+        deviceId: { exact: selectedCamera.deviceId },
+        width: { exact: profile.width },
+        height: { exact: profile.height },
+        frameRate: { ideal: 30, max: 30 }
+      },
+      audio: false
+    };
+  }
+
+  return {
+    video: {
+      facingMode,
+      width: { exact: profile.width },
+      height: { exact: profile.height },
+      frameRate: { ideal: 30, max: 30 }
+    },
+    audio: false
+  };
 }
 
 function stopStream() {
@@ -33,6 +130,44 @@ function stopStream() {
   }
   stream.getTracks().forEach(track => track.stop());
   stream = null;
+  cameraReady = false;
+}
+
+function waitForVideoReady() {
+  if (videoEl.readyState >= 2 && videoEl.videoWidth && videoEl.videoHeight) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Timed out waiting for camera frames."));
+    }, 5000);
+
+    function cleanup() {
+      window.clearTimeout(timeoutId);
+      videoEl.removeEventListener("loadedmetadata", onReady);
+      videoEl.removeEventListener("canplay", onReady);
+      videoEl.removeEventListener("error", onError);
+    }
+
+    function onReady() {
+      if (!videoEl.videoWidth || !videoEl.videoHeight) {
+        return;
+      }
+      cleanup();
+      resolve();
+    }
+
+    function onError() {
+      cleanup();
+      reject(new Error("Video element failed while waiting for camera frames."));
+    }
+
+    videoEl.addEventListener("loadedmetadata", onReady);
+    videoEl.addEventListener("canplay", onReady);
+    videoEl.addEventListener("error", onError);
+  });
 }
 
 async function startCamera() {
@@ -42,24 +177,37 @@ async function startCamera() {
   }
 
   stopStream();
+  cameraReady = false;
+  await refreshAvailableCameras();
   renderCameraLabel();
+  setStatus("Starting camera...", false);
 
   try {
-    const facingMode = getCameraFacingMode();
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: facingMode },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      },
-      audio: false
-    });
+    stream = await navigator.mediaDevices.getUserMedia(buildCameraConstraints());
 
     videoEl.srcObject = stream;
-    await videoEl.play();
+    await new Promise(resolve => {
+      videoEl.onloadedmetadata = async () => {
+        try {
+          await videoEl.play();
+          await waitForVideoReady();
+          window.setTimeout(resolve, 100);
+        } catch (error) {
+          console.error("Video play error", error);
+          resolve();
+        }
+      };
+    });
+
+    await refreshAvailableCameras();
+    renderCameraLabel();
+    cameraReady = true;
     setStatus("Ready. Press side button to capture.", false);
   } catch (error) {
-    setStatus("Camera start failed.", true);
+    const message = error && error.name === "NotAllowedError"
+      ? "Camera permission blocked."
+      : "Camera start failed.";
+    setStatus(message, true);
     console.error("Failed to start camera", error);
   }
 }
@@ -68,13 +216,14 @@ async function switchCamera(direction) {
   if (busy) {
     return;
   }
-  cameraIndex = (cameraIndex + (direction > 0 ? 1 : -1) + CAMERA_ORDER.length) % CAMERA_ORDER.length;
+  const count = cameras.length > 0 ? cameras.length : CAMERA_ORDER.length;
+  cameraIndex = (cameraIndex + (direction > 0 ? 1 : -1) + count) % count;
   setStatus("Switching camera...", false);
   await startCamera();
 }
 
 function captureDataUrl() {
-  if (!videoEl.videoWidth || !videoEl.videoHeight) {
+  if (!cameraReady || !videoEl.videoWidth || !videoEl.videoHeight) {
     return null;
   }
 
