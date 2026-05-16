@@ -1,63 +1,63 @@
-function relayPointerInputToIframe(inputType, direction) {
+function withIframe(targetFn) {
   const iframe = document.getElementById("target-iframe");
   if (!iframe || !iframe.src || !iframe.contentWindow) {
     return;
   }
+  targetFn(iframe);
+}
 
-  // Hand focus to iframe first so the embedded page receives native-like input.
-  iframe.focus();
-  iframe.contentWindow.focus();
-
+function canAccessIframeWindow(iframe) {
   try {
-    const doc = iframe.contentWindow.document;
-    const x = Math.floor(iframe.clientWidth / 2);
-    const y = Math.floor(iframe.clientHeight / 2);
-    const target = doc.elementFromPoint(x, y) || doc.body || doc.documentElement;
-
-    if (!target) {
-      return;
-    }
-
-    if (typeof target.focus === "function") {
-      target.focus();
-    }
-
-    if (inputType === "wheel") {
-      const deltaY = direction > 0 ? 120 : -120;
-      target.dispatchEvent(new WheelEvent("wheel", {
-        bubbles: true,
-        cancelable: true,
-        deltaY,
-        clientX: x,
-        clientY: y
-      }));
-      return;
-    }
-
-    if (inputType === "click") {
-      const eventInit = {
-        bubbles: true,
-        cancelable: true,
-        button: 0,
-        buttons: 1,
-        clientX: x,
-        clientY: y,
-        detail: 1
-      };
-
-      target.dispatchEvent(new MouseEvent("mousedown", eventInit));
-      target.dispatchEvent(new MouseEvent("mouseup", { ...eventInit, buttons: 0 }));
-      target.dispatchEvent(new MouseEvent("click", { ...eventInit, buttons: 0 }));
-      return;
-    }
-  } catch (error) {
-    // Fallback for cross-origin frames: ask the child frame to synthesize input.
-    iframe.contentWindow.postMessage({
-      type: "launcher-native-input",
-      inputType,
-      direction: direction || 0
-    }, "*");
+    // Cross-origin frames throw here.
+    void iframe.contentWindow.document;
+    return true;
+  } catch (_error) {
+    return false;
   }
+}
+
+function relayHardwareEventToIframe(eventName) {
+  withIframe(iframe => {
+    iframe.focus();
+    iframe.contentWindow.focus();
+
+    if (canAccessIframeWindow(iframe)) {
+      iframe.contentWindow.dispatchEvent(new Event(eventName));
+      return;
+    }
+
+    // Cross-origin fallback: only works if child page listens for this message.
+    iframe.contentWindow.postMessage({
+      type: "hardware-event",
+      event: eventName
+    }, "*");
+  });
+}
+
+function relayTouchToIframe(type, x, y) {
+  if (typeof TouchEventHandler === "undefined") {
+    return;
+  }
+
+  TouchEventHandler.postMessage(JSON.stringify({ type, x, y }));
+}
+
+function relayNativeTapAtCenter() {
+  // Coordinates tuned for the app viewport center on r1.
+  const x = 120;
+  const y = 141;
+  relayTouchToIframe("tap", x, y);
+}
+
+function relayNativeScroll(direction) {
+  // Simulate short drag gesture at center for cross-origin pages.
+  const x = 120;
+  const yStart = 150;
+  const yEnd = direction > 0 ? 130 : 170;
+
+  relayTouchToIframe("down", x, yStart);
+  relayTouchToIframe("move", x, yEnd);
+  relayTouchToIframe("up", x, yEnd);
 }
 
 function cycleFromScroll(direction) {
@@ -65,7 +65,9 @@ function cycleFromScroll(direction) {
   const isViewing = viewingView && viewingView.classList.contains('active');
   
   if (isViewing) {
-    relayPointerInputToIframe("wheel", direction);
+    const eventName = direction > 0 ? "scrollDown" : "scrollUp";
+    relayHardwareEventToIframe(eventName);
+    relayNativeScroll(direction);
   } else if (window.launcher) {
     window.launcher.cycleTarget(direction);
   }
@@ -77,7 +79,8 @@ function launchFromSideClick() {
   const backBtn = document.getElementById('back-btn');
   
   if (isViewing && backBtn && backBtn.style.display !== 'none') {
-    relayPointerInputToIframe("click", 0);
+    relayHardwareEventToIframe("sideClick");
+    relayNativeTapAtCenter();
   } else if (window.launcher) {
     window.launcher.launchCurrentTarget();
   }

@@ -6,7 +6,8 @@ const TARGETS = [
     typeLabel: "Custom Creation",
     description: "Launch a local creation hosted in this repository.",
     launchUrl: "https://electricbears.github.io/R1-Creations-pages/TNG-Tricorder/",
-    launchMode: "web"
+    launchMode: "web",
+    embedInIframe: true
   },
   {
     id: "plex",
@@ -15,7 +16,8 @@ const TARGETS = [
     typeLabel: "External Website",
     description: "Open the hosted Plex web app.",
     launchUrl: "https://app.plex.tv/desktop/",
-    launchMode: "web"
+    launchMode: "web",
+    embedInIframe: false
   },
   {
     id: "home-assistant",
@@ -24,7 +26,8 @@ const TARGETS = [
     typeLabel: "External Website",
     description: "Open your Home Assistant dashboard endpoint.",
     launchUrl: "https://www.home-assistant.io/",
-    launchMode: "web"
+    launchMode: "web",
+    embedInIframe: true
   },
   {
     id: "settings",
@@ -122,7 +125,13 @@ function launchCurrentTarget() {
   statusSecondary.textContent = `${target.name} (${target.kind})`;
 
   if (target.launchMode === "web") {
-    launchInIframe(target.launchUrl);
+    if (target.embedInIframe) {
+      launchInIframe(target.launchUrl);
+    } else {
+      statusPrimary.textContent = "Opening";
+      statusSecondary.textContent = `${target.name} blocks iframe embedding. Opening directly.`;
+      launchWebTarget(target.launchUrl);
+    }
     return;
   }
 
