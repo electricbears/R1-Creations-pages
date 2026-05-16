@@ -54,6 +54,20 @@
     </footer>
   </div>
 
+  <script>
+    // Listen for hardware events relayed from launcher and dispatch them in iframe context
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'hardware-event') {
+        const iframe = document.getElementById('target-iframe');
+        if (iframe && iframe.contentWindow === event.source) {
+          // Ignore messages from iframe
+          return;
+        }
+        // Dispatch event on the window so listeners in this context catch it
+        window.dispatchEvent(new Event(event.data.event));
+      }
+    });
+  </script>
   <script src="js/hardware.js"></script>
   <script src="js/speak.js"></script>
   <script src="js/app.js"></script>

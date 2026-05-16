@@ -1,12 +1,31 @@
+function relayEventToIframe(eventName) {
+  const iframe = document.getElementById('target-iframe');
+  if (iframe && iframe.src) {
+    iframe.contentWindow.postMessage({ type: 'hardware-event', event: eventName }, '*');
+  }
+}
+
 function cycleFromScroll(direction) {
-    if (window.launcher) {
-     window.launcher.cycleTarget(direction);
+  const viewingView = document.getElementById('viewing-view');
+  const isViewing = viewingView && viewingView.classList.contains('active');
+  
+  if (isViewing) {
+    const eventName = direction > 0 ? 'scrollDown' : 'scrollUp';
+    relayEventToIframe(eventName);
+  } else if (window.launcher) {
+    window.launcher.cycleTarget(direction);
   }
 }
 
 function launchFromSideClick() {
-    if (window.launcher) {
-     window.launcher.launchCurrentTarget();
+  const viewingView = document.getElementById('viewing-view');
+  const isViewing = viewingView && viewingView.classList.contains('active');
+  const backBtn = document.getElementById('back-btn');
+  
+  if (isViewing && backBtn && backBtn.style.display !== 'none') {
+    relayEventToIframe('sideClick');
+  } else if (window.launcher) {
+    window.launcher.launchCurrentTarget();
   }
 }
 
