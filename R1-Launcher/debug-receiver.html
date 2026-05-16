@@ -24,20 +24,27 @@
       width: 240px;
       height: 282px;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
     .card {
       background: var(--panel);
       border: 1px solid rgba(125, 170, 230, 0.35);
       border-radius: 8px;
       padding: 6px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
     }
-    .title { color: var(--accent); font-size: 11px; letter-spacing: 0.06em; }
-    .subtitle { color: var(--muted); font-size: 8px; margin-bottom: 4px; }
+    .title { color: var(--accent); font-size: 11px; letter-spacing: 0.06em; flex-shrink: 0; }
+    .subtitle { color: var(--muted); font-size: 8px; margin-bottom: 4px; flex-shrink: 0; }
     .stats {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 4px;
       margin-bottom: 6px;
+      flex-shrink: 0;
     }
     .stat {
       background: rgba(255, 255, 255, 0.04);
@@ -50,7 +57,7 @@
     .label { color: var(--muted); }
     .value { color: var(--ok); font-size: 10px; }
     .log {
-      height: 152px;
+      flex: 1;
       overflow: auto;
       background: #0a1220;
       border: 1px solid rgba(125, 170, 230, 0.25);
@@ -58,6 +65,7 @@
       padding: 4px;
       font: 8px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       white-space: pre-wrap;
+      min-height: 0;
     }
     .ok { color: var(--ok); }
     .warn { color: var(--warn); }
