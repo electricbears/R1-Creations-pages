@@ -43,7 +43,7 @@
 
       <div id="viewing-view" class="view">
         <div id="iframe-container" class="iframe-container">
-          <iframe id="target-iframe" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals"></iframe>
+          <iframe id="target-iframe" tabindex="-1" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals"></iframe>
         </div>
       </div>
     </main>
@@ -54,20 +54,6 @@
     </footer>
   </div>
 
-  <script>
-    // Listen for hardware events relayed from launcher and dispatch them in iframe context
-    window.addEventListener('message', function(event) {
-      if (event.data && event.data.type === 'hardware-event') {
-        const iframe = document.getElementById('target-iframe');
-        if (iframe && iframe.contentWindow === event.source) {
-          // Ignore messages from iframe
-          return;
-        }
-        // Dispatch event on the window so listeners in this context catch it
-        window.dispatchEvent(new Event(event.data.event));
-      }
-    });
-  </script>
   <script src="js/hardware.js"></script>
   <script src="js/speak.js"></script>
   <script src="js/app.js"></script>
