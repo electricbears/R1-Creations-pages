@@ -44,9 +44,10 @@ const TARGETS = [
     name: "R1 Settings",
     kind: "builtin",
     typeLabel: "Built-in App",
-    description: "Placeholder for built-in app deep-link support.",
+    description: "Ask the assistant to open device settings.",
     launchUrl: "rabbit://settings",
-    launchMode: "deeplink"
+    launchMode: "deeplink",
+    llmCommand: "Open settings"
   },
   {
     id: "creation-sample",
@@ -128,11 +129,44 @@ function launchViaBridge(target) {
   PluginMessageHandler.postMessage(JSON.stringify(payload));
 }
 
+function launchViaLLMCommand(commandText) {
+  if (typeof window.launcherSpeak === "function") {
+    window.launcherSpeak(commandText);
+    return true;
+  }
+
+  if (typeof PluginMessageHandler === "undefined") {
+    return false;
+  }
+
+  PluginMessageHandler.postMessage(
+    JSON.stringify({
+      message: `Speak this exactly and nothing else: ${commandText}`,
+      useLLM: true,
+      wantsR1Response: true,
+      wantsJournalEntry: false
+    })
+  );
+  return true;
+}
+
 function launchCurrentTarget() {
   const target = getCurrentTarget();
 
   statusPrimary.textContent = "Launching";
   statusSecondary.textContent = `${target.name} (${target.kind})`;
+
+  if (target.llmCommand) {
+    const sent = launchViaLLMCommand(target.llmCommand);
+    if (sent) {
+      statusPrimary.textContent = "Request Sent";
+      statusSecondary.textContent = `Sent LLM command: ${target.llmCommand}`;
+    } else {
+      statusPrimary.textContent = "Bridge Missing";
+      statusSecondary.textContent = "PluginMessageHandler unavailable in this runtime.";
+    }
+    return;
+  }
 
   if (target.launchMode === "web") {
     if (target.embedInIframe) {
@@ -153,11 +187,14 @@ function showView(viewName) {
   document.getElementById('viewing-view').classList.remove('active');
   document.getElementById(viewName).classList.add('active');
   
+  const app = document.getElementById('app');
   const backBtn = document.getElementById('back-btn');
   if (viewName === 'viewing-view') {
     backBtn.style.display = 'block';
+    app.classList.add('fullscreen');
   } else {
     backBtn.style.display = 'none';
+    app.classList.remove('fullscreen');
   }
 }
 
@@ -178,7 +215,8 @@ function goBack() {
 
 window.launcher = {
   cycleTarget,
-  launchCurrentTarget
+  launchCurrentTarget,
+  goBack
 };
 
 document.getElementById('back-btn').addEventListener('click', goBack);

@@ -73,11 +73,25 @@ function cycleFromScroll(direction) {
   }
 }
 
+let lastSideClickTime = 0;
+
 function launchFromSideClick() {
+  const now = Date.now();
+  const isDoubleClick = (now - lastSideClickTime) < 300; // 300ms threshold
+  lastSideClickTime = now;
+  
   const viewingView = document.getElementById('viewing-view');
   const isViewing = viewingView && viewingView.classList.contains('active');
-  const backBtn = document.getElementById('back-btn');
   
+  if (isViewing && isDoubleClick) {
+    // Double click returns to main screen
+    if (window.launcher) {
+      window.launcher.goBack();
+    }
+    return;
+  }
+  
+  const backBtn = document.getElementById('back-btn');
   if (isViewing && backBtn && backBtn.style.display !== 'none') {
     relayHardwareEventToIframe("sideClick");
     relayNativeTapAtCenter();
