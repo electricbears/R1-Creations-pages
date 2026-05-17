@@ -1,3 +1,4 @@
+const BUILD = "2026-05-17a";
 const PROMPT = "Take this image in a Hulk style";
 const CAMERA_ORDER = ["environment", "user"];
 const CAMERA_PROFILES = {
@@ -378,20 +379,43 @@ function postToMagicPhoto(imageDataUrl) {
 }
 
 // Receive and display the runtime response in the debug panel
-window.onPluginMessage = function(data) {
-  updateDebug("[RESPONSE] received");
+function _handlePluginMessage(data) {
+  updateDebug("[RESPONSE] fired");
   try {
-    const msg = data.message || "";
-    const extra = data.data || "";
-    updateDebug(`[MSG] ${String(msg).substring(0, 80)}`);
-    if (extra) {
-      updateDebug(`[DATA] ${String(extra).substring(0, 80)}`);
-    }
+    // Log raw data first
+    let raw;
+    try { raw = typeof data === "string" ? data : JSON.stringify(data); } catch(e) { raw = String(data); }
+    updateDebug(`[RAW] ${raw.substring(0, 100)}`);
+    const parsed = typeof data === "string" ? JSON.parse(data) : data;
+    const msg = (parsed && parsed.message) || "";
+    const extra = (parsed && parsed.data) || "";
+    if (msg) updateDebug(`[MSG] ${String(msg).substring(0, 80)}`);
+    if (extra) updateDebug(`[DATA] ${String(extra).substring(0, 80)}`);
     setStatus(msg ? String(msg).substring(0, 60) : "Response received.", false);
   } catch (e) {
     updateDebug(`[RESPONSE] parse error: ${e.message}`);
   }
-};
+}
+
+window.onPluginMessage = _handlePluginMessage;
+
+// Guard: restore our handler if the runtime overrides it after page load
+setInterval(function() {
+  if (window.onPluginMessage !== _handlePluginMessage) {
+    updateDebug("[WARN] onPluginMessage overridden — restoring");
+    window.onPluginMessage = _handlePluginMessage;
+  }
+}, 500);
+
+// Also catch raw postMessage events (some runtimes use this instead)
+window.addEventListener("message", function(event) {
+  try {
+    const raw = typeof event.data === "string" ? event.data : JSON.stringify(event.data);
+    updateDebug(`[MSG_EVT] ${raw.substring(0, 100)}`);
+  } catch(e) {
+    updateDebug(`[MSG_EVT] ${String(event.data).substring(0, 60)}`);
+  }
+});
 
 async function takePhotoAndSubmit() {
   if (!cameraStarted) {
@@ -474,9 +498,14 @@ renderCameraLabel();
 showStartUi();
 setStatus("Waiting for camera start...", false);
 
+const buildIdEl = document.getElementById("build-id");
+if (buildIdEl) buildIdEl.textContent = `build ${BUILD}`;
+
 // Log initialization info
 updateDebug("=== HULKIFY READY ===");
+updateDebug(`Build: ${BUILD}`);
 updateDebug(`In iframe: ${window.self !== window.top}`);
 updateDebug(`MagicPhotoHandler: ${typeof MagicPhotoHandler !== "undefined"}`);
 updateDebug(`PluginMessageHandler: ${typeof PluginMessageHandler !== "undefined"}`);
+updateDebug(`onPluginMessage set: ${typeof window.onPluginMessage === "function"}`);
 updateDebug("(Double-click or press D for debug)");

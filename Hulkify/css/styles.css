@@ -114,6 +114,13 @@ body {
   color: #f3fff3;
 }
 
+.build-id {
+  font-size: 9px;
+  color: var(--muted);
+  opacity: 0.6;
+  letter-spacing: 0.05em;
+}
+
 .start-text {
   font-size: 10px;
   line-height: 1.35;
