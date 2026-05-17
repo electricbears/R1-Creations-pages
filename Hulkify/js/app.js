@@ -302,8 +302,20 @@ function captureDataUrl() {
     return null;
   }
 
-  canvasEl.width = videoEl.videoWidth;
-  canvasEl.height = videoEl.videoHeight;
+  // Normalize to 4:3 aspect ratio with black bars, max 640px wide,
+  // matching Magic Kamera's Wn() normalization before submission.
+  const srcW = videoEl.videoWidth;
+  const srcH = videoEl.videoHeight;
+  let outW = Math.min(srcW, 640);
+  let outH = Math.round(outW * 4 / 3);
+  // If source is taller than 4:3, use height as the constraint instead
+  if (srcH > Math.round(srcW * 4 / 3)) {
+    outH = Math.min(srcH, 480);
+    outW = Math.round(outH * 3 / 4);
+  }
+
+  canvasEl.width = outW;
+  canvasEl.height = outH;
 
   const ctx = canvasEl.getContext("2d");
   if (!ctx) {
@@ -312,8 +324,16 @@ function captureDataUrl() {
   }
 
   try {
-    ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-    const dataUrl = canvasEl.toDataURL("image/jpeg", 0.9);
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, outW, outH);
+    // Scale and center the video frame
+    const scale = Math.min(outW / srcW, outH / srcH);
+    const drawW = Math.round(srcW * scale);
+    const drawH = Math.round(srcH * scale);
+    const dx = Math.floor((outW - drawW) / 2);
+    const dy = Math.floor((outH - drawH) / 2);
+    ctx.drawImage(videoEl, dx, dy, drawW, drawH);
+    const dataUrl = canvasEl.toDataURL("image/jpeg", 0.92);
     
     if (!dataUrl || dataUrl.length < 100) {
       updateDebug(`[CAP] Bad data: len=${dataUrl ? dataUrl.length : 0}`);
@@ -332,8 +352,9 @@ function postToMagicPhoto(imageDataUrl) {
   // Extract base64 from data URL (remove "data:image/jpeg;base64," prefix)
   const base64Data = imageDataUrl.split(",")[1] || imageDataUrl;
 
+  // No pluginId — Hulkify is a web creation, not a native plugin.
+  // pluginId: "com.r1.pixelart" belongs to Magic Kamera and routes results there.
   const payload = {
-    pluginId: "com.r1.pixelart",
     imageBase64: base64Data,
     message: PROMPT
   };
