@@ -1,4 +1,4 @@
-const BUILD = "2026-05-17c";
+const BUILD = "2026-05-17d";
 const PROMPT = "Take this image in a Hulk style";
 const LLM_TIME_TEST_PROMPT = "what time is it?";
 const CAMERA_ORDER = ["environment", "user"];
@@ -38,6 +38,7 @@ const debugContentEl = document.getElementById("debug-content");
 let debugMode = false;
 let debugLog = [];
 let speakNextResponse = false;
+let llmTestPending = false;
 
 function updateDebug(message) {
   debugLog.push(message);
@@ -80,6 +81,21 @@ function setStartButtonBusy(isBusy) {
   }
   if (llmTestButtonEl) {
     llmTestButtonEl.disabled = isBusy;
+  }
+}
+
+function setLlmTestButtonState(state) {
+  if (!llmTestButtonEl) {
+    return;
+  }
+
+  llmTestButtonEl.classList.remove("was-tapped", "response-ok", "response-error");
+  if (state === "tapped") {
+    llmTestButtonEl.classList.add("was-tapped");
+  } else if (state === "ok") {
+    llmTestButtonEl.classList.add("response-ok");
+  } else if (state === "error") {
+    llmTestButtonEl.classList.add("response-error");
   }
 }
 
@@ -421,15 +437,20 @@ function speakText(text) {
 }
 
 function runTextLLMTimeTest() {
+  llmTestPending = true;
+  speakNextResponse = false;
+  setLlmTestButtonState("tapped");
   setStatus("Testing LLM text prompt...", false);
-  const sent = postTextToLLM(LLM_TIME_TEST_PROMPT, false);
+  // plugin-demo pattern: text message + useLLM + wantsR1Response true
+  const sent = postTextToLLM(LLM_TIME_TEST_PROMPT, true);
   if (!sent) {
+    llmTestPending = false;
+    setLlmTestButtonState("error");
     setStatus("LLM test failed to send.", true);
     return;
   }
 
-  speakNextResponse = true;
-  setStatus("LLM test sent. Waiting for response...", false);
+  setStatus("LLM test sent. Listening for spoken reply...", false);
 }
 
 // Receive and display the runtime response in the debug panel
@@ -453,6 +474,11 @@ function _handlePluginMessage(data) {
     if (msg) updateDebug(`[MSG] ${String(msg).substring(0, 80)}`);
     if (extra) updateDebug(`[DATA] ${String(extra).substring(0, 80)}`);
 
+    if (llmTestPending) {
+      llmTestPending = false;
+      setLlmTestButtonState(msg ? "ok" : "error");
+    }
+
     if (speakNextResponse && msg) {
       speakNextResponse = false;
       const didSpeak = speakText(msg);
@@ -466,6 +492,10 @@ function _handlePluginMessage(data) {
     setStatus(msg ? String(msg).substring(0, 60) : "Response received.", false);
   } catch (e) {
     speakNextResponse = false;
+    if (llmTestPending) {
+      llmTestPending = false;
+      setLlmTestButtonState("error");
+    }
     updateDebug(`[RESPONSE] parse error: ${e.message}`);
   }
 }

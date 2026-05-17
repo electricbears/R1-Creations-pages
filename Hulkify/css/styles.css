@@ -146,6 +146,24 @@ body {
   box-shadow: none;
 }
 
+.start-button.secondary.was-tapped {
+  background: rgba(132, 200, 255, 0.22);
+  border-color: rgba(132, 200, 255, 0.75);
+  color: #dff1ff;
+}
+
+.start-button.secondary.response-ok {
+  background: rgba(132, 255, 132, 0.22);
+  border-color: rgba(132, 255, 132, 0.85);
+  color: #e6ffe6;
+}
+
+.start-button.secondary.response-error {
+  background: rgba(255, 122, 122, 0.18);
+  border-color: rgba(255, 122, 122, 0.8);
+  color: #ffdede;
+}
+
 .start-button:disabled {
   opacity: 0.55;
 }
