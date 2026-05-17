@@ -285,15 +285,13 @@ function captureDataUrl() {
 }
 
 function postToMagicPhoto(imageDataUrl) {
+  // Extract base64 from data URL (remove "data:image/jpeg;base64," prefix)
+  const base64Data = imageDataUrl.split(",")[1] || imageDataUrl;
+
   const payload = {
-    type: "magic-photo",
-    prompt: PROMPT,
-    message: PROMPT,
-    image: imageDataUrl,
-    imageDataUrl,
-    useLLM: true,
-    wantsR1Response: false,
-    wantsJournalEntry: false
+    pluginId: "com.r1.pixelart",
+    imageBase64: base64Data,
+    message: PROMPT
   };
 
   if (typeof MagicPhotoHandler !== "undefined" && MagicPhotoHandler && typeof MagicPhotoHandler.postMessage === "function") {

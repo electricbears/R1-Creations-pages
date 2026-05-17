@@ -13,3 +13,6 @@
 !.vscode/settings.json
 !.vscode/extensions.json
 !.vscode/tasks.json
+
+# Installation QR codes
+*-r1-install-qr.png
