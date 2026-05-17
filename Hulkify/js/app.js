@@ -1,4 +1,4 @@
-const BUILD = "2026-05-17a";
+const BUILD = "2026-05-17b";
 const PROMPT = "Take this image in a Hulk style";
 const CAMERA_ORDER = ["environment", "user"];
 const CAMERA_PROFILES = {
@@ -357,7 +357,10 @@ function postToMagicPhoto(imageDataUrl) {
 
   const payload = {
     message: PROMPT,
-    imageBase64: base64Data
+    imageBase64: base64Data,
+    useLLM: true,
+    wantsR1Response: true,
+    wantsJournalEntry: true
   };
 
   updateDebug(`[SEND] ${Math.round(base64Data.length / 1024)}KB`);
