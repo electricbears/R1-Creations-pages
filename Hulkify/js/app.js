@@ -1,4 +1,4 @@
-const BUILD = "2026-05-17d";
+const BUILD = "2026-05-17e";
 const PROMPT = "Take this image in a Hulk style";
 const LLM_TIME_TEST_PROMPT = "what time is it?";
 const CAMERA_ORDER = ["environment", "user"];
