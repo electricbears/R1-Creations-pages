@@ -372,20 +372,19 @@ function captureDataUrl() {
 }
 
 function postToMagicPhoto(imageDataUrl) {
-  // Match DomKamForever/Magic Kamera exactly:
-  // split off data URL prefix, send { message, imageBase64 }
-  // pluginId is auto-injected/overridden by the runtime — do not set it.
   const base64Data = imageDataUrl.split(",")[1] || imageDataUrl;
 
   const payload = {
-    message: PROMPT,
-    imageBase64: base64Data,
+    message: JSON.stringify({
+      prompt: PROMPT,
+      imageBase64: base64Data
+    }),
     useLLM: true,
     wantsR1Response: true,
     wantsJournalEntry: true
   };
 
-  updateDebug(`[SEND] ${Math.round(base64Data.length / 1024)}KB`);
+  updateDebug(`[SEND] ${Math.round(base64Data.length / 1024)}KB as JSON message`);
 
   if (typeof PluginMessageHandler !== "undefined" && PluginMessageHandler && typeof PluginMessageHandler.postMessage === "function") {
     updateDebug("[SEND] via PluginMessageHandler");
