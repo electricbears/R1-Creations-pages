@@ -349,45 +349,49 @@ function captureDataUrl() {
 }
 
 function postToMagicPhoto(imageDataUrl) {
-  // Extract base64 from data URL (remove "data:image/jpeg;base64," prefix)
+  // Match DomKamForever/Magic Kamera exactly:
+  // split off data URL prefix, send { message, imageBase64 }
+  // pluginId is auto-injected/overridden by the runtime — do not set it.
   const base64Data = imageDataUrl.split(",")[1] || imageDataUrl;
 
-  // No pluginId — Hulkify is a web creation, not a native plugin.
-  // pluginId: "com.r1.pixelart" belongs to Magic Kamera and routes results there.
   const payload = {
-    imageBase64: base64Data,
-    message: PROMPT
+    message: PROMPT,
+    imageBase64: base64Data
   };
 
-  updateDebug(`[SEND] base64 len: ${base64Data.length}`);
-
-  if (typeof MagicPhotoHandler !== "undefined" && MagicPhotoHandler && typeof MagicPhotoHandler.postMessage === "function") {
-    updateDebug("[SEND] using MagicPhotoHandler");
-    try {
-      MagicPhotoHandler.postMessage(JSON.stringify(payload));
-      updateDebug("[SEND] MagicPhotoHandler OK");
-      return true;
-    } catch (error) {
-      updateDebug(`[ERROR] MagicPhotoHandler: ${error.message}`);
-      return false;
-    }
-  }
+  updateDebug(`[SEND] ${Math.round(base64Data.length / 1024)}KB`);
 
   if (typeof PluginMessageHandler !== "undefined" && PluginMessageHandler && typeof PluginMessageHandler.postMessage === "function") {
-    updateDebug("[SEND] using PluginMessageHandler");
+    updateDebug("[SEND] via PluginMessageHandler");
     try {
       PluginMessageHandler.postMessage(JSON.stringify(payload));
-      updateDebug("[SEND] PluginMessageHandler OK");
+      updateDebug("[SEND] OK — awaiting response");
       return true;
     } catch (error) {
-      updateDebug(`[ERROR] PluginMessageHandler: ${error.message}`);
+      updateDebug(`[ERROR] PMH: ${error.message}`);
       return false;
     }
   }
 
-  updateDebug("[ERROR] No handler available");
+  updateDebug("[ERROR] No PluginMessageHandler");
   return false;
 }
+
+// Receive and display the runtime response in the debug panel
+window.onPluginMessage = function(data) {
+  updateDebug("[RESPONSE] received");
+  try {
+    const msg = data.message || "";
+    const extra = data.data || "";
+    updateDebug(`[MSG] ${String(msg).substring(0, 80)}`);
+    if (extra) {
+      updateDebug(`[DATA] ${String(extra).substring(0, 80)}`);
+    }
+    setStatus(msg ? String(msg).substring(0, 60) : "Response received.", false);
+  } catch (e) {
+    updateDebug(`[RESPONSE] parse error: ${e.message}`);
+  }
+};
 
 async function takePhotoAndSubmit() {
   if (!cameraStarted) {
