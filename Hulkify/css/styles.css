@@ -139,6 +139,13 @@ body {
   box-shadow: 0 8px 20px rgba(132, 255, 132, 0.22);
 }
 
+.start-button.secondary {
+  color: var(--ink);
+  background: rgba(132, 255, 132, 0.12);
+  border: 1px solid rgba(132, 255, 132, 0.45);
+  box-shadow: none;
+}
+
 .start-button:disabled {
   opacity: 0.55;
 }

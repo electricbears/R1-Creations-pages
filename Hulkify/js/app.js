@@ -1,5 +1,6 @@
-const BUILD = "2026-05-17b";
+const BUILD = "2026-05-17c";
 const PROMPT = "Take this image in a Hulk style";
+const LLM_TIME_TEST_PROMPT = "what time is it?";
 const CAMERA_ORDER = ["environment", "user"];
 const CAMERA_PROFILES = {
   environment: {
@@ -26,6 +27,7 @@ const appEl = document.getElementById("app");
 const startScreenEl = document.getElementById("start-screen");
 const startTextEl = document.getElementById("start-text");
 const startButtonEl = document.getElementById("start-button");
+const llmTestButtonEl = document.getElementById("llm-test-button");
 const videoEl = document.getElementById("viewfinder");
 const canvasEl = document.getElementById("capture-canvas");
 const cameraLabelEl = document.getElementById("camera-label");
@@ -35,6 +37,7 @@ const debugContentEl = document.getElementById("debug-content");
 
 let debugMode = false;
 let debugLog = [];
+let speakNextResponse = false;
 
 function updateDebug(message) {
   debugLog.push(message);
@@ -74,6 +77,9 @@ function setStartText(message) {
 function setStartButtonBusy(isBusy) {
   if (startButtonEl) {
     startButtonEl.disabled = isBusy;
+  }
+  if (llmTestButtonEl) {
+    llmTestButtonEl.disabled = isBusy;
   }
 }
 
@@ -381,6 +387,51 @@ function postToMagicPhoto(imageDataUrl) {
   return false;
 }
 
+function postTextToLLM(message, wantsR1Response) {
+  const payload = {
+    message,
+    useLLM: true,
+    wantsR1Response: Boolean(wantsR1Response),
+    wantsJournalEntry: false
+  };
+
+  updateDebug(`[TEXT_SEND] ${String(message).substring(0, 60)}`);
+
+  if (typeof PluginMessageHandler !== "undefined" && PluginMessageHandler && typeof PluginMessageHandler.postMessage === "function") {
+    try {
+      PluginMessageHandler.postMessage(JSON.stringify(payload));
+      updateDebug("[TEXT_SEND] OK");
+      return true;
+    } catch (error) {
+      updateDebug(`[TEXT_SEND] ERROR: ${error.message}`);
+      return false;
+    }
+  }
+
+  updateDebug("[TEXT_SEND] No PluginMessageHandler");
+  return false;
+}
+
+function speakText(text) {
+  const spoken = String(text || "").trim();
+  if (!spoken) {
+    return false;
+  }
+  return postTextToLLM(`Speak this exactly and nothing else: ${spoken}`, true);
+}
+
+function runTextLLMTimeTest() {
+  setStatus("Testing LLM text prompt...", false);
+  const sent = postTextToLLM(LLM_TIME_TEST_PROMPT, false);
+  if (!sent) {
+    setStatus("LLM test failed to send.", true);
+    return;
+  }
+
+  speakNextResponse = true;
+  setStatus("LLM test sent. Waiting for response...", false);
+}
+
 // Receive and display the runtime response in the debug panel
 function _handlePluginMessage(data) {
   updateDebug("[RESPONSE] fired");
@@ -389,13 +440,32 @@ function _handlePluginMessage(data) {
     let raw;
     try { raw = typeof data === "string" ? data : JSON.stringify(data); } catch(e) { raw = String(data); }
     updateDebug(`[RAW] ${raw.substring(0, 100)}`);
-    const parsed = typeof data === "string" ? JSON.parse(data) : data;
+    let parsed = data;
+    if (typeof data === "string") {
+      try {
+        parsed = JSON.parse(data);
+      } catch (_parseError) {
+        parsed = { message: data };
+      }
+    }
     const msg = (parsed && parsed.message) || "";
     const extra = (parsed && parsed.data) || "";
     if (msg) updateDebug(`[MSG] ${String(msg).substring(0, 80)}`);
     if (extra) updateDebug(`[DATA] ${String(extra).substring(0, 80)}`);
+
+    if (speakNextResponse && msg) {
+      speakNextResponse = false;
+      const didSpeak = speakText(msg);
+      if (didSpeak) {
+        updateDebug("[SPEAK] Triggered response speech");
+      } else {
+        updateDebug("[SPEAK] Failed to trigger speech");
+      }
+    }
+
     setStatus(msg ? String(msg).substring(0, 60) : "Response received.", false);
   } catch (e) {
+    speakNextResponse = false;
     updateDebug(`[RESPONSE] parse error: ${e.message}`);
   }
 }
@@ -477,6 +547,12 @@ window.addEventListener("keydown", event => {
 startButtonEl.addEventListener("click", () => {
   startCamera();
 });
+
+if (llmTestButtonEl) {
+  llmTestButtonEl.addEventListener("click", () => {
+    runTextLLMTimeTest();
+  });
+}
 
 window.addEventListener("beforeunload", stopStream);
 
