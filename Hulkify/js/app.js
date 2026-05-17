@@ -269,6 +269,11 @@ async function switchCamera(direction) {
 
 function captureDataUrl() {
   if (!cameraReady || !videoEl.videoWidth || !videoEl.videoHeight) {
+    console.error("captureDataUrl: camera not ready", {
+      cameraReady,
+      videoWidth: videoEl.videoWidth,
+      videoHeight: videoEl.videoHeight
+    });
     return null;
   }
 
@@ -277,11 +282,31 @@ function captureDataUrl() {
 
   const ctx = canvasEl.getContext("2d");
   if (!ctx) {
+    console.error("captureDataUrl: failed to get canvas context");
     return null;
   }
 
-  ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-  return canvasEl.toDataURL("image/jpeg", 0.9);
+  try {
+    ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+    const dataUrl = canvasEl.toDataURL("image/jpeg", 0.9);
+    
+    if (!dataUrl || dataUrl.length < 100) {
+      console.error("captureDataUrl: invalid or too small data URL", {
+        dataUrlLength: dataUrl ? dataUrl.length : 0
+      });
+      return null;
+    }
+    
+    console.log("captureDataUrl: success", {
+      width: canvasEl.width,
+      height: canvasEl.height,
+      dataUrlLength: dataUrl.length
+    });
+    return dataUrl;
+  } catch (error) {
+    console.error("captureDataUrl: exception during capture", error);
+    return null;
+  }
 }
 
 function postToMagicPhoto(imageDataUrl) {
@@ -294,16 +319,40 @@ function postToMagicPhoto(imageDataUrl) {
     message: PROMPT
   };
 
+  console.log("postToMagicPhoto: payload ready", {
+    pluginId: payload.pluginId,
+    promptLength: PROMPT.length,
+    imageBase64Length: base64Data.length
+  });
+
   if (typeof MagicPhotoHandler !== "undefined" && MagicPhotoHandler && typeof MagicPhotoHandler.postMessage === "function") {
-    MagicPhotoHandler.postMessage(JSON.stringify(payload));
-    return true;
+    console.log("postToMagicPhoto: using MagicPhotoHandler");
+    try {
+      MagicPhotoHandler.postMessage(JSON.stringify(payload));
+      console.log("postToMagicPhoto: MagicPhotoHandler.postMessage succeeded");
+      return true;
+    } catch (error) {
+      console.error("postToMagicPhoto: MagicPhotoHandler.postMessage failed", error);
+      return false;
+    }
   }
 
   if (typeof PluginMessageHandler !== "undefined" && PluginMessageHandler && typeof PluginMessageHandler.postMessage === "function") {
-    PluginMessageHandler.postMessage(JSON.stringify(payload));
-    return true;
+    console.log("postToMagicPhoto: using PluginMessageHandler");
+    try {
+      PluginMessageHandler.postMessage(JSON.stringify(payload));
+      console.log("postToMagicPhoto: PluginMessageHandler.postMessage succeeded");
+      return true;
+    } catch (error) {
+      console.error("postToMagicPhoto: PluginMessageHandler.postMessage failed", error);
+      return false;
+    }
   }
 
+  console.error("postToMagicPhoto: no handler available", {
+    hasMagicPhotoHandler: typeof MagicPhotoHandler !== "undefined",
+    hasPluginMessageHandler: typeof PluginMessageHandler !== "undefined"
+  });
   return false;
 }
 
@@ -314,25 +363,31 @@ async function takePhotoAndSubmit() {
   }
 
   if (busy) {
+    console.warn("takePhotoAndSubmit: already busy, ignoring");
     return;
   }
 
   busy = true;
   setStatus("Capturing...", false);
+  console.log("takePhotoAndSubmit: starting capture");
 
   try {
     const imageDataUrl = captureDataUrl();
     if (!imageDataUrl) {
       setStatus("Capture failed. Camera not ready.", true);
+      console.error("takePhotoAndSubmit: capture returned null");
       return;
     }
 
+    console.log("takePhotoAndSubmit: capture succeeded, image data url length:", imageDataUrl.length);
     setStatus("Submitting to Hulkify...", false);
     const sent = postToMagicPhoto(imageDataUrl);
     if (sent) {
       setStatus("Submitted. Generating Hulk style.", false);
+      console.log("takePhotoAndSubmit: submission succeeded");
     } else {
       setStatus("Runtime bridge unavailable.", true);
+      console.error("takePhotoAndSubmit: submission failed - no handler available");
     }
   } finally {
     busy = false;
@@ -362,6 +417,11 @@ startButtonEl.addEventListener("click", () => {
 });
 
 window.addEventListener("beforeunload", stopStream);
+
+console.log("Hulkify: initializing", {
+  hasMagicPhotoHandler: typeof MagicPhotoHandler !== "undefined",
+  hasPluginMessageHandler: typeof PluginMessageHandler !== "undefined"
+});
 
 renderCameraLabel();
 showStartUi();
