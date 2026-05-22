@@ -1,5 +1,6 @@
-const BUILD = "2026-05-22d";
-const PROMPT = "Take a picture in a cyberpunk style with neon colors, tech elements, and futuristic vibes.";
+const BUILD = "2026-05-22e";
+//const PROMPT = "Take a picture in a cyberpunk style with neon colors, tech elements, and futuristic vibes.";
+const PROMPT = "Take a picture and make it a caricature. Defined by exaggerated features, bold expressions, and a humorous twist while preserving likeness. It captures the essence of a person or scene in a fun, over-the-top way, like something you would get from a street artist at a fair, bursting with personality and charm.";
 const LLM_TIME_TEST_PROMPT = "what time is it?";
 const IMAGE_PLUGIN_ID = "com.r1.pixelart";
 const IMAGE_RESPONSE_TIMEOUT_MS = 60000;
