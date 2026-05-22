@@ -1,6 +1,8 @@
 const BUILD = "2026-05-22a";
 const PROMPT = "Take a picture in a cyberpunk style with neon colors, tech elements, and futuristic vibes.";
 const LLM_TIME_TEST_PROMPT = "what time is it?";
+const IMAGE_PLUGIN_ID = "com.r1.pixelart";
+const IMAGE_RESPONSE_TIMEOUT_MS = 60000;
 const CAMERA_ORDER = ["environment", "user"];
 const CAMERA_PROFILES = {
   environment: {
@@ -39,6 +41,8 @@ let debugMode = false;
 let debugLog = [];
 let speakNextResponse = false;
 let llmTestPending = false;
+let imageResponsePending = false;
+let imageResponseTimer = null;
 
 function updateDebug(message) {
   debugLog.push(message);
@@ -97,6 +101,32 @@ function setLlmTestButtonState(state) {
   } else if (state === "error") {
     llmTestButtonEl.classList.add("response-error");
   }
+}
+
+function clearImageResponseTimeout() {
+  if (imageResponseTimer) {
+    window.clearTimeout(imageResponseTimer);
+    imageResponseTimer = null;
+  }
+}
+
+function setImageResponsePending(isPending) {
+  imageResponsePending = Boolean(isPending);
+  if (!imageResponsePending) {
+    clearImageResponseTimeout();
+  }
+}
+
+function armImageResponseTimeout() {
+  clearImageResponseTimeout();
+  imageResponseTimer = window.setTimeout(() => {
+    if (!imageResponsePending) {
+      return;
+    }
+    setImageResponsePending(false);
+    updateDebug("[TIMEOUT] No image response within 60s");
+    setStatus("No AI response yet. Try capturing again.", true);
+  }, IMAGE_RESPONSE_TIMEOUT_MS);
 }
 
 function showCameraUi() {
@@ -372,24 +402,41 @@ function captureDataUrl() {
 }
 
 function postToMagicPhoto(imageDataUrl) {
-  const base64Data = imageDataUrl.split(",")[1] || imageDataUrl;
+  const matches = typeof imageDataUrl === "string" ? imageDataUrl.match(/base64,(.+)$/) : null;
+  const base64Data = matches ? matches[1] : String(imageDataUrl || "");
+
+  if (!base64Data || base64Data.length < 100) {
+    updateDebug("[SEND] Invalid base64 payload");
+    return false;
+  }
 
   const payload = {
-    message: JSON.stringify({
-      prompt: PROMPT,
-      imageBase64: base64Data
-    }),
-    useLLM: true,
-    wantsR1Response: true,
-    wantsJournalEntry: true
+    message: PROMPT,
+    pluginId: IMAGE_PLUGIN_ID,
+    imageBase64: base64Data
   };
 
-  updateDebug(`[SEND] ${Math.round(base64Data.length / 1024)}KB as JSON message`);
+  updateDebug(`[SEND] ${Math.round(base64Data.length / 1024)}KB prompt+image pluginId=${IMAGE_PLUGIN_ID}`);
+
+  if (typeof MagicPhotoHandler !== "undefined" && MagicPhotoHandler && typeof MagicPhotoHandler.postMessage === "function") {
+    updateDebug("[SEND] via MagicPhotoHandler");
+    try {
+      MagicPhotoHandler.postMessage(JSON.stringify(payload));
+      setImageResponsePending(true);
+      armImageResponseTimeout();
+      updateDebug("[SEND] OK — awaiting response");
+      return true;
+    } catch (error) {
+      updateDebug(`[ERROR] MPH: ${error.message}`);
+    }
+  }
 
   if (typeof PluginMessageHandler !== "undefined" && PluginMessageHandler && typeof PluginMessageHandler.postMessage === "function") {
-    updateDebug("[SEND] via PluginMessageHandler");
+    updateDebug("[SEND] via PluginMessageHandler (fallback)");
     try {
       PluginMessageHandler.postMessage(JSON.stringify(payload));
+      setImageResponsePending(true);
+      armImageResponseTimeout();
       updateDebug("[SEND] OK — awaiting response");
       return true;
     } catch (error) {
@@ -470,12 +517,41 @@ function _handlePluginMessage(data) {
     }
     const msg = (parsed && parsed.message) || "";
     const extra = (parsed && parsed.data) || "";
+    const status = parsed && parsed.status ? String(parsed.status).toLowerCase() : "";
+    const errorText = parsed && parsed.error ? String(parsed.error) : "";
+    const generatedImage = (parsed && (
+      parsed.imageUrl ||
+      parsed.image ||
+      parsed.generated_image ||
+      (parsed.result && parsed.result.image) ||
+      (parsed.result && parsed.result.imageUrl)
+    )) || "";
+
     if (msg) updateDebug(`[MSG] ${String(msg).substring(0, 80)}`);
     if (extra) updateDebug(`[DATA] ${String(extra).substring(0, 80)}`);
+    if (status) updateDebug(`[STATUS_EVT] ${status}`);
+    if (errorText) updateDebug(`[ERR_EVT] ${errorText.substring(0, 80)}`);
+    if (generatedImage) updateDebug(`[IMG_EVT] ${String(generatedImage).substring(0, 80)}`);
+
+    if (imageResponsePending && (status || msg || extra || errorText || generatedImage)) {
+      if (status === "processing") {
+        setStatus("AI is processing your image...", false);
+        armImageResponseTimeout();
+      } else if (status === "complete") {
+        setImageResponsePending(false);
+        setStatus("AI transformation complete!", false);
+      } else if (errorText) {
+        setImageResponsePending(false);
+        setStatus(`Error: ${errorText}`.substring(0, 80), true);
+      } else if (generatedImage) {
+        setImageResponsePending(false);
+        setStatus("Image result received.", false);
+      }
+    }
 
     if (llmTestPending) {
       llmTestPending = false;
-      setLlmTestButtonState(msg ? "ok" : "error");
+      setLlmTestButtonState(msg || status === "complete" ? "ok" : "error");
     }
 
     if (speakNextResponse && msg) {
@@ -488,7 +564,9 @@ function _handlePluginMessage(data) {
       }
     }
 
-    setStatus(msg ? String(msg).substring(0, 60) : "Response received.", false);
+    if (!status && !errorText) {
+      setStatus(msg ? String(msg).substring(0, 60) : "Response received.", false);
+    }
   } catch (e) {
     speakNextResponse = false;
     if (llmTestPending) {
@@ -531,6 +609,7 @@ async function takePhotoAndSubmit() {
   }
 
   busy = true;
+  setImageResponsePending(false);
   setStatus("Capturing...", false);
   updateDebug("[PHOTO] Starting");
 
@@ -545,7 +624,7 @@ async function takePhotoAndSubmit() {
     setStatus("Submitting to Hulkify...", false);
     const sent = postToMagicPhoto(imageDataUrl);
     if (sent) {
-      setStatus("Submitted. Generating Hulk style.", false);
+      setStatus("Submitted. Waiting for AI response...", false);
     } else {
       setStatus("Runtime bridge unavailable.", true);
       updateDebug("[PHOTO] No handler");
@@ -584,6 +663,7 @@ if (llmTestButtonEl) {
 }
 
 window.addEventListener("beforeunload", stopStream);
+window.addEventListener("beforeunload", clearImageResponseTimeout);
 
 // Toggle debug mode with double-click on app or long-press
 let lastStartScreenClick = 0;
@@ -616,4 +696,5 @@ updateDebug(`In iframe: ${window.self !== window.top}`);
 updateDebug(`MagicPhotoHandler: ${typeof MagicPhotoHandler !== "undefined"}`);
 updateDebug(`PluginMessageHandler: ${typeof PluginMessageHandler !== "undefined"}`);
 updateDebug(`onPluginMessage set: ${typeof window.onPluginMessage === "function"}`);
+updateDebug(`Image pluginId: ${IMAGE_PLUGIN_ID}`);
 updateDebug("(Double-click or press D for debug)");
