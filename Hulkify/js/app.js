@@ -1,5 +1,5 @@
 const BUILD = "2026-05-17e";
-const PROMPT = "Take this image in a Hulk style";
+const PROMPT = "Take a picture in a cyberpunk style with neon colors, tech elements, and futuristic vibes.";
 const LLM_TIME_TEST_PROMPT = "what time is it?";
 const CAMERA_ORDER = ["environment", "user"];
 const CAMERA_PROFILES = {
