@@ -1,4 +1,4 @@
-const BUILD = "2026-05-22b";
+const BUILD = "2026-05-22c";
 const PROMPT = "Take a picture in a cyberpunk style with neon colors, tech elements, and futuristic vibes.";
 const LLM_TIME_TEST_PROMPT = "what time is it?";
 const IMAGE_PLUGIN_ID = "com.r1.pixelart";
