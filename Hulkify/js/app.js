@@ -1,4 +1,4 @@
-const BUILD = "2026-05-22c";
+const BUILD = "2026-05-22d";
 const PROMPT = "Take a picture in a cyberpunk style with neon colors, tech elements, and futuristic vibes.";
 const LLM_TIME_TEST_PROMPT = "what time is it?";
 const IMAGE_PLUGIN_ID = "com.r1.pixelart";
@@ -146,6 +146,7 @@ function scheduleImageRetry(base64Data) {
       wantsR1Response: true,
       wantsJournalEntry: true
     };
+    updateDebug(`[RETRY] alt payload imageBase64 len=${Math.round(base64Data.length / 1024)}KB`);
 
     if (typeof PluginMessageHandler !== "undefined" && PluginMessageHandler && typeof PluginMessageHandler.postMessage === "function") {
       try {
@@ -447,45 +448,33 @@ function captureDataUrl() {
 }
 
 function postToMagicPhoto(imageDataUrl) {
-  const matches = typeof imageDataUrl === "string" ? imageDataUrl.match(/base64,(.+)$/) : null;
-  const base64Data = matches ? matches[1] : String(imageDataUrl || "");
+  // MagicKamera passes the full data URL (data:image/jpeg;base64,...) directly.
+  // Raw base64 (stripped prefix) is NOT used.
+  const dataUrl = typeof imageDataUrl === "string" ? imageDataUrl : String(imageDataUrl || "");
 
-  if (!base64Data || base64Data.length < 100) {
-    updateDebug("[SEND] Invalid base64 payload");
+  if (!dataUrl || dataUrl.length < 100) {
+    updateDebug("[SEND] Invalid image payload");
     return false;
   }
 
   const payload = {
-    message: PROMPT,
     pluginId: IMAGE_PLUGIN_ID,
-    imageBase64: base64Data
+    imageBase64: dataUrl
   };
-
-  updateDebug(`[SEND] ${Math.round(base64Data.length / 1024)}KB prompt+image pluginId=${IMAGE_PLUGIN_ID}`);
-
-  if (typeof MagicPhotoHandler !== "undefined" && MagicPhotoHandler && typeof MagicPhotoHandler.postMessage === "function") {
-    updateDebug("[SEND] via MagicPhotoHandler");
-    try {
-      MagicPhotoHandler.postMessage(JSON.stringify(payload));
-      setImageResponsePending(true);
-      imageRetryAttempted = false;
-      armImageResponseTimeout();
-      scheduleImageRetry(base64Data);
-      updateDebug("[SEND] OK — awaiting response");
-      return true;
-    } catch (error) {
-      updateDebug(`[ERROR] MPH: ${error.message}`);
-    }
+  if (PROMPT && PROMPT.trim()) {
+    payload.message = PROMPT;
   }
 
+  updateDebug(`[SEND] ${Math.round(dataUrl.length / 1024)}KB image pluginId=${IMAGE_PLUGIN_ID}`);
+
   if (typeof PluginMessageHandler !== "undefined" && PluginMessageHandler && typeof PluginMessageHandler.postMessage === "function") {
-    updateDebug("[SEND] via PluginMessageHandler (fallback)");
+    updateDebug("[SEND] via PluginMessageHandler");
     try {
       PluginMessageHandler.postMessage(JSON.stringify(payload));
       setImageResponsePending(true);
       imageRetryAttempted = false;
       armImageResponseTimeout();
-      scheduleImageRetry(base64Data);
+      scheduleImageRetry(dataUrl);
       updateDebug("[SEND] OK — awaiting response");
       return true;
     } catch (error) {
