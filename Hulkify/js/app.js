@@ -43,6 +43,8 @@ let speakNextResponse = false;
 let llmTestPending = false;
 let imageResponsePending = false;
 let imageResponseTimer = null;
+let imageRetryTimer = null;
+let imageRetryAttempted = false;
 
 function updateDebug(message) {
   debugLog.push(message);
@@ -110,11 +112,54 @@ function clearImageResponseTimeout() {
   }
 }
 
+function clearImageRetryTimeout() {
+  if (imageRetryTimer) {
+    window.clearTimeout(imageRetryTimer);
+    imageRetryTimer = null;
+  }
+}
+
 function setImageResponsePending(isPending) {
   imageResponsePending = Boolean(isPending);
   if (!imageResponsePending) {
     clearImageResponseTimeout();
+    clearImageRetryTimeout();
   }
+}
+
+function scheduleImageRetry(base64Data) {
+  clearImageRetryTimeout();
+  imageRetryTimer = window.setTimeout(() => {
+    if (!imageResponsePending || imageRetryAttempted) {
+      return;
+    }
+
+    imageRetryAttempted = true;
+    updateDebug("[RETRY] No callback yet; sending alternate LLM payload");
+
+    const alternatePayload = {
+      message: JSON.stringify({
+        prompt: PROMPT,
+        imageBase64: base64Data
+      }),
+      useLLM: true,
+      wantsR1Response: true,
+      wantsJournalEntry: true
+    };
+
+    if (typeof PluginMessageHandler !== "undefined" && PluginMessageHandler && typeof PluginMessageHandler.postMessage === "function") {
+      try {
+        PluginMessageHandler.postMessage(JSON.stringify(alternatePayload));
+        updateDebug("[RETRY] Alternate payload sent via PluginMessageHandler");
+        armImageResponseTimeout();
+      } catch (error) {
+        updateDebug(`[RETRY] ERROR: ${error.message}`);
+      }
+      return;
+    }
+
+    updateDebug("[RETRY] PluginMessageHandler unavailable for alternate payload");
+  }, 8000);
 }
 
 function armImageResponseTimeout() {
@@ -423,7 +468,9 @@ function postToMagicPhoto(imageDataUrl) {
     try {
       MagicPhotoHandler.postMessage(JSON.stringify(payload));
       setImageResponsePending(true);
+      imageRetryAttempted = false;
       armImageResponseTimeout();
+      scheduleImageRetry(base64Data);
       updateDebug("[SEND] OK — awaiting response");
       return true;
     } catch (error) {
@@ -436,7 +483,9 @@ function postToMagicPhoto(imageDataUrl) {
     try {
       PluginMessageHandler.postMessage(JSON.stringify(payload));
       setImageResponsePending(true);
+      imageRetryAttempted = false;
       armImageResponseTimeout();
+      scheduleImageRetry(base64Data);
       updateDebug("[SEND] OK — awaiting response");
       return true;
     } catch (error) {
@@ -534,6 +583,7 @@ function _handlePluginMessage(data) {
     if (generatedImage) updateDebug(`[IMG_EVT] ${String(generatedImage).substring(0, 80)}`);
 
     if (imageResponsePending && (status || msg || extra || errorText || generatedImage)) {
+      clearImageRetryTimeout();
       if (status === "processing") {
         setStatus("AI is processing your image...", false);
         armImageResponseTimeout();
@@ -579,13 +629,11 @@ function _handlePluginMessage(data) {
 
 window.onPluginMessage = _handlePluginMessage;
 
-// Guard: restore our handler if the runtime overrides it after page load
-setInterval(function() {
-  if (window.onPluginMessage !== _handlePluginMessage) {
-    updateDebug("[WARN] onPluginMessage overridden — restoring");
-    window.onPluginMessage = _handlePluginMessage;
-  }
-}, 500);
+// Some wrappers dispatch a CustomEvent("pluginMessage") instead of direct callback.
+window.addEventListener("pluginMessage", function(event) {
+  updateDebug("[PLUGIN_EVT] received");
+  _handlePluginMessage(event && Object.prototype.hasOwnProperty.call(event, "detail") ? event.detail : event);
+});
 
 // Also catch raw postMessage events (some runtimes use this instead)
 window.addEventListener("message", function(event) {
@@ -664,6 +712,7 @@ if (llmTestButtonEl) {
 
 window.addEventListener("beforeunload", stopStream);
 window.addEventListener("beforeunload", clearImageResponseTimeout);
+window.addEventListener("beforeunload", clearImageRetryTimeout);
 
 // Toggle debug mode with double-click on app or long-press
 let lastStartScreenClick = 0;
