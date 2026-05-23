@@ -81,6 +81,16 @@ body {
   letter-spacing: 0.06em;
 }
 
+.badge-button {
+  pointer-events: auto;
+  color: var(--ink);
+  cursor: pointer;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .start-screen {
   position: absolute;
   inset: 0;
@@ -252,6 +262,11 @@ body {
 .theme-item.active {
   border-color: rgba(132, 255, 132, 0.82);
   background: rgba(132, 255, 132, 0.2);
+}
+
+.theme-item.selected {
+  border-color: rgba(173, 255, 147, 0.95);
+  box-shadow: 0 0 0 1px rgba(173, 255, 147, 0.45);
 }
 
 .theme-item-title {

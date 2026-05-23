@@ -1,4 +1,4 @@
-const BUILD = "2026-05-23a";
+const BUILD = "2026-05-23b";
 const THEME_STORAGE_KEY = "hulkify.selectedThemeTitle";
 const DEFAULT_PROMPT = "Take a picture in a cyberpunk style with neon colors, tech elements, and futuristic vibes.";
 const LLM_TIME_TEST_PROMPT = "what time is it?";
@@ -36,6 +36,7 @@ const llmTestButtonEl = document.getElementById("llm-test-button");
 const themeModalEl = document.getElementById("theme-modal");
 const themeListEl = document.getElementById("theme-list");
 const themeCloseButtonEl = document.getElementById("theme-close-button");
+const themeBadgeEl = document.getElementById("theme-badge");
 const videoEl = document.getElementById("viewfinder");
 const canvasEl = document.getElementById("capture-canvas");
 const cameraLabelEl = document.getElementById("camera-label");
@@ -54,6 +55,7 @@ let imageRetryAttempted = false;
 let photoThemes = [];
 let activeTheme = null;
 let activePrompt = DEFAULT_PROMPT;
+let themeSelectionIndex = 0;
 
 function updateDebug(message) {
   debugLog.push(message);
@@ -115,11 +117,50 @@ function setLlmTestButtonState(state) {
 }
 
 function setThemeLabel() {
-  if (!themeCurrentEl) {
+  const title = activeTheme && activeTheme.title ? activeTheme.title : "Custom";
+  if (themeCurrentEl) {
+    themeCurrentEl.textContent = `Theme: ${title}`;
+  }
+  if (themeBadgeEl) {
+    themeBadgeEl.textContent = title;
+  }
+}
+
+function getThemeModalIsOpen() {
+  return Boolean(themeModalEl && themeModalEl.classList.contains("show"));
+}
+
+function getStartScreenIsVisible() {
+  return Boolean(startScreenEl && startScreenEl.style.display !== "none");
+}
+
+function clampThemeSelection(index) {
+  if (!photoThemes.length) {
+    themeSelectionIndex = 0;
     return;
   }
-  const title = activeTheme && activeTheme.title ? activeTheme.title : "Custom";
-  themeCurrentEl.textContent = `Theme: ${title}`;
+  const max = photoThemes.length - 1;
+  themeSelectionIndex = Math.max(0, Math.min(max, index));
+}
+
+function moveThemeSelection(delta) {
+  if (!photoThemes.length) {
+    return;
+  }
+  clampThemeSelection(themeSelectionIndex + delta);
+  renderThemeList();
+}
+
+function selectHighlightedTheme() {
+  if (!photoThemes.length) {
+    return;
+  }
+  const theme = photoThemes[themeSelectionIndex];
+  if (!theme) {
+    return;
+  }
+  setActiveThemeByTitle(theme.title, true);
+  closeThemeModal();
 }
 
 function closeThemeModal() {
@@ -134,8 +175,15 @@ function openThemeModal() {
   if (!themeModalEl) {
     return;
   }
+  if (activeTheme) {
+    const activeIndex = photoThemes.findIndex(theme => theme.title === activeTheme.title);
+    if (activeIndex >= 0) {
+      themeSelectionIndex = activeIndex;
+    }
+  }
   themeModalEl.classList.add("show");
   themeModalEl.setAttribute("aria-hidden", "false");
+  renderThemeList();
 }
 
 function renderThemeList() {
@@ -146,11 +194,15 @@ function renderThemeList() {
   themeListEl.textContent = "";
 
   photoThemes.forEach(theme => {
+    const themeIndex = photoThemes.findIndex(candidate => candidate.title === theme.title);
     const itemButton = document.createElement("button");
     itemButton.type = "button";
     itemButton.className = "theme-item";
     if (activeTheme && activeTheme.title === theme.title) {
       itemButton.classList.add("active");
+    }
+    if (themeIndex === themeSelectionIndex) {
+      itemButton.classList.add("selected");
     }
 
     const titleEl = document.createElement("span");
@@ -166,11 +218,16 @@ function renderThemeList() {
     }
 
     itemButton.addEventListener("click", () => {
+      themeSelectionIndex = themeIndex;
       setActiveThemeByTitle(theme.title, true);
       closeThemeModal();
     });
 
     themeListEl.appendChild(itemButton);
+
+    if (themeIndex === themeSelectionIndex) {
+      itemButton.scrollIntoView({ block: "nearest" });
+    }
   });
 }
 
@@ -213,6 +270,10 @@ function setActiveThemeByTitle(title, persistSelection) {
 
   activeTheme = photoThemes.find(theme => theme.default) || photoThemes[0] || null;
   activePrompt = activeTheme && activeTheme.prompt ? activeTheme.prompt : DEFAULT_PROMPT;
+  themeSelectionIndex = photoThemes.findIndex(theme => activeTheme && theme.title === activeTheme.title);
+  if (themeSelectionIndex < 0) {
+    themeSelectionIndex = 0;
+  }
 
   if (persistSelection && activeTheme && activeTheme.title) {
     try {
@@ -348,6 +409,28 @@ function showStartUi() {
     startScreenEl.style.display = "flex";
   }
   videoEl.style.display = "none";
+}
+
+function handleWheelNavigation(direction) {
+  if (getThemeModalIsOpen()) {
+    moveThemeSelection(direction > 0 ? 1 : -1);
+    return;
+  }
+
+  if (getStartScreenIsVisible() || !cameraStarted) {
+    return;
+  }
+
+  switchCamera(direction);
+}
+
+function handleSideClickAction() {
+  if (getThemeModalIsOpen()) {
+    selectHighlightedTheme();
+    return;
+  }
+
+  takePhotoAndSubmit();
 }
 
 function getCameraFacingMode() {
@@ -832,21 +915,17 @@ async function takePhotoAndSubmit() {
   }
 }
 
-window.addEventListener("scrollUp", () => switchCamera(-1));
-window.addEventListener("scrollDown", () => switchCamera(1));
-window.addEventListener("sideClick", () => takePhotoAndSubmit());
+window.addEventListener("scrollUp", () => handleWheelNavigation(-1));
+window.addEventListener("scrollDown", () => handleWheelNavigation(1));
+window.addEventListener("sideClick", () => handleSideClickAction());
 
 window.addEventListener("keydown", event => {
   if (event.key === "ArrowUp") {
-    if (cameraStarted) {
-      switchCamera(-1);
-    }
+    handleWheelNavigation(-1);
   } else if (event.key === "ArrowDown") {
-    if (cameraStarted) {
-      switchCamera(1);
-    }
+    handleWheelNavigation(1);
   } else if (event.key === "Enter") {
-    takePhotoAndSubmit();
+    handleSideClickAction();
   }
 });
 
@@ -863,6 +942,14 @@ if (llmTestButtonEl) {
 if (themeButtonEl) {
   themeButtonEl.addEventListener("click", () => {
     openThemeModal();
+  });
+}
+
+if (themeBadgeEl) {
+  themeBadgeEl.addEventListener("click", () => {
+    closeThemeModal();
+    showStartUi();
+    setStatus("Ready. Press Start Camera or side button.", false);
   });
 }
 
