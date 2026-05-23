@@ -2,20 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Hulkify</title>
+  <title>Hulkify — Starfleet Imaging</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
   <div id="app">
     <div id="start-screen" class="start-screen">
-      <div class="start-badge">HULKIFY</div>
+      <div class="start-badge">STARFLEET IMAGING</div>
       <div class="start-title">Gamma Camera</div>
       <div id="build-id" class="build-id"></div>
-      <div id="start-text" class="start-text">Press side button or tap Start to enable the camera.</div>
+      <div id="start-text" class="start-text">Press side button or tap Engage to activate imaging array.</div>
       <button id="theme-button" class="start-button secondary" type="button">SELECT THEME</button>
       <div id="theme-current" class="theme-current">Theme: loading...</div>
-      <button id="start-button" class="start-button" type="button">START CAMERA</button>
+      <button id="start-button" class="start-button" type="button">ENGAGE CAMERA</button>
       <button id="llm-test-button" class="start-button secondary" type="button">TEST LLM (TIME)</button>
     </div>
 
@@ -33,13 +33,13 @@
     <canvas id="capture-canvas" aria-hidden="true"></canvas>
 
     <div class="overlay top">
-      <button id="theme-badge" class="badge badge-button" type="button">HULKIFY</button>
+      <button id="theme-badge" class="badge badge-button" type="button">STARFLEET IMAGING</button>
       <span id="camera-label" class="badge">BACK CAM</span>
     </div>
 
     <div class="overlay bottom">
       <div id="status">Starting camera...</div>
-      <div class="hint">Wheel: switch cam | Side: take + Hulkify</div>
+      <div class="hint">Wheel: switch cam | Side: capture + transform</div>
     </div>
 
     <div id="debug-panel" class="debug-panel">
