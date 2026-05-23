@@ -1,4 +1,4 @@
-const BUILD = "2026-05-23c";
+const BUILD = "2026-05-23d";
 const THEME_STORAGE_KEY = "hulkify.selectedThemeTitle";
 const DEFAULT_PROMPT = "Take a picture in a cyberpunk style with neon colors, tech elements, and futuristic vibes.";
 const LLM_TIME_TEST_PROMPT = "what time is it?";
@@ -437,6 +437,15 @@ function handleWheelNavigation(direction) {
 
 function attemptExitToHome() {
   updateDebug("[EXIT] Attempting to return to home");
+
+  if (typeof closeWebView !== "undefined" && closeWebView && typeof closeWebView.postMessage === "function") {
+    try {
+      closeWebView.postMessage("");
+      return;
+    } catch (_error) {
+      // Continue through fallback options.
+    }
+  }
 
   if (typeof PluginMessageHandler !== "undefined" && PluginMessageHandler && typeof PluginMessageHandler.postMessage === "function") {
     const exitPayloads = [
