@@ -127,6 +127,13 @@ body {
   color: var(--muted);
 }
 
+.theme-current {
+  font-size: 9px;
+  line-height: 1.3;
+  color: var(--accent);
+  opacity: 0.9;
+}
+
 .start-button {
   border: 0;
   border-radius: 999px;
@@ -166,6 +173,99 @@ body {
 
 .start-button:disabled {
   opacity: 0.55;
+}
+
+.theme-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.theme-modal.show {
+  display: flex;
+}
+
+.theme-modal-card {
+  width: 100%;
+  max-height: 92%;
+  border: 1px solid rgba(132, 255, 132, 0.45);
+  border-radius: 10px;
+  background: rgba(7, 16, 7, 0.96);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.48);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.theme-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid rgba(132, 255, 132, 0.22);
+}
+
+.theme-modal-title {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+}
+
+.theme-close-button {
+  border: 1px solid rgba(132, 255, 132, 0.4);
+  border-radius: 999px;
+  min-width: 20px;
+  height: 20px;
+  background: rgba(132, 255, 132, 0.1);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.theme-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  overflow: auto;
+}
+
+.theme-item {
+  width: 100%;
+  border: 1px solid rgba(132, 255, 132, 0.34);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(132, 255, 132, 0.08);
+  color: var(--ink);
+  text-align: left;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.theme-item.active {
+  border-color: rgba(132, 255, 132, 0.82);
+  background: rgba(132, 255, 132, 0.2);
+}
+
+.theme-item-title {
+  display: block;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.theme-item-default {
+  display: block;
+  margin-top: 2px;
+  font-size: 8px;
+  opacity: 0.9;
+  color: var(--accent);
 }
 
 #status {

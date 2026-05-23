@@ -1,6 +1,6 @@
-const BUILD = "2026-05-22e";
-//const PROMPT = "Take a picture in a cyberpunk style with neon colors, tech elements, and futuristic vibes.";
-const PROMPT = "Take a picture and make it a caricature. Defined by exaggerated features, bold expressions, and a humorous twist while preserving likeness. It captures the essence of a person or scene in a fun, over-the-top way, like something you would get from a street artist at a fair, bursting with personality and charm.";
+const BUILD = "2026-05-23a";
+const THEME_STORAGE_KEY = "hulkify.selectedThemeTitle";
+const DEFAULT_PROMPT = "Take a picture in a cyberpunk style with neon colors, tech elements, and futuristic vibes.";
 const LLM_TIME_TEST_PROMPT = "what time is it?";
 const IMAGE_PLUGIN_ID = "com.r1.pixelart";
 const IMAGE_RESPONSE_TIMEOUT_MS = 60000;
@@ -29,8 +29,13 @@ let startingCamera = false;
 const appEl = document.getElementById("app");
 const startScreenEl = document.getElementById("start-screen");
 const startTextEl = document.getElementById("start-text");
+const themeButtonEl = document.getElementById("theme-button");
+const themeCurrentEl = document.getElementById("theme-current");
 const startButtonEl = document.getElementById("start-button");
 const llmTestButtonEl = document.getElementById("llm-test-button");
+const themeModalEl = document.getElementById("theme-modal");
+const themeListEl = document.getElementById("theme-list");
+const themeCloseButtonEl = document.getElementById("theme-close-button");
 const videoEl = document.getElementById("viewfinder");
 const canvasEl = document.getElementById("capture-canvas");
 const cameraLabelEl = document.getElementById("camera-label");
@@ -46,6 +51,9 @@ let imageResponsePending = false;
 let imageResponseTimer = null;
 let imageRetryTimer = null;
 let imageRetryAttempted = false;
+let photoThemes = [];
+let activeTheme = null;
+let activePrompt = DEFAULT_PROMPT;
 
 function updateDebug(message) {
   debugLog.push(message);
@@ -106,6 +114,158 @@ function setLlmTestButtonState(state) {
   }
 }
 
+function setThemeLabel() {
+  if (!themeCurrentEl) {
+    return;
+  }
+  const title = activeTheme && activeTheme.title ? activeTheme.title : "Custom";
+  themeCurrentEl.textContent = `Theme: ${title}`;
+}
+
+function closeThemeModal() {
+  if (!themeModalEl) {
+    return;
+  }
+  themeModalEl.classList.remove("show");
+  themeModalEl.setAttribute("aria-hidden", "true");
+}
+
+function openThemeModal() {
+  if (!themeModalEl) {
+    return;
+  }
+  themeModalEl.classList.add("show");
+  themeModalEl.setAttribute("aria-hidden", "false");
+}
+
+function renderThemeList() {
+  if (!themeListEl) {
+    return;
+  }
+
+  themeListEl.textContent = "";
+
+  photoThemes.forEach(theme => {
+    const itemButton = document.createElement("button");
+    itemButton.type = "button";
+    itemButton.className = "theme-item";
+    if (activeTheme && activeTheme.title === theme.title) {
+      itemButton.classList.add("active");
+    }
+
+    const titleEl = document.createElement("span");
+    titleEl.className = "theme-item-title";
+    titleEl.textContent = theme.title || "Untitled";
+    itemButton.appendChild(titleEl);
+
+    if (theme.default) {
+      const defaultEl = document.createElement("span");
+      defaultEl.className = "theme-item-default";
+      defaultEl.textContent = "Default";
+      itemButton.appendChild(defaultEl);
+    }
+
+    itemButton.addEventListener("click", () => {
+      setActiveThemeByTitle(theme.title, true);
+      closeThemeModal();
+    });
+
+    themeListEl.appendChild(itemButton);
+  });
+}
+
+function normalizeThemeData(payload) {
+  const inputThemes = payload && Array.isArray(payload.themes) ? payload.themes : [];
+  return inputThemes
+    .filter(theme => theme && typeof theme.title === "string" && typeof theme.prompt === "string")
+    .map(theme => ({
+      title: theme.title,
+      prompt: theme.prompt,
+      default: Boolean(theme.default)
+    }));
+}
+
+function setActiveThemeByTitle(title, persistSelection) {
+  if (!photoThemes.length) {
+    return;
+  }
+
+  const resolvedTitle = typeof title === "string" ? title : "";
+  let matchFound = false;
+
+  photoThemes = photoThemes.map(theme => {
+    const isMatch = theme.title === resolvedTitle;
+    if (isMatch) {
+      matchFound = true;
+    }
+    return {
+      ...theme,
+      default: isMatch
+    };
+  });
+
+  if (!matchFound) {
+    photoThemes = photoThemes.map((theme, index) => ({
+      ...theme,
+      default: index === 0
+    }));
+  }
+
+  activeTheme = photoThemes.find(theme => theme.default) || photoThemes[0] || null;
+  activePrompt = activeTheme && activeTheme.prompt ? activeTheme.prompt : DEFAULT_PROMPT;
+
+  if (persistSelection && activeTheme && activeTheme.title) {
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, activeTheme.title);
+    } catch (_storageError) {
+      // Ignore storage errors in restricted runtimes.
+    }
+  }
+
+  updateDebug(`[THEME] ${activeTheme ? activeTheme.title : "none"}`);
+  setThemeLabel();
+  renderThemeList();
+}
+
+async function loadPhotoThemes() {
+  try {
+    const response = await fetch("js/photoThemes.json", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Theme load failed: ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const normalizedThemes = normalizeThemeData(payload);
+
+    if (!normalizedThemes.length) {
+      throw new Error("No valid themes found");
+    }
+
+    photoThemes = normalizedThemes;
+
+    let preferredTitle = "";
+    try {
+      preferredTitle = window.localStorage.getItem(THEME_STORAGE_KEY) || "";
+    } catch (_storageError) {
+      preferredTitle = "";
+    }
+
+    const defaultTheme = photoThemes.find(theme => theme.default);
+    setActiveThemeByTitle(preferredTitle || (defaultTheme && defaultTheme.title) || photoThemes[0].title, true);
+  } catch (error) {
+    updateDebug(`[THEME] Fallback default prompt: ${error.message}`);
+    photoThemes = [{
+      title: "Cyberpunk",
+      prompt: DEFAULT_PROMPT,
+      default: true
+    }];
+    activeTheme = photoThemes[0];
+    activePrompt = DEFAULT_PROMPT;
+    setThemeLabel();
+    renderThemeList();
+  }
+}
+
 function clearImageResponseTimeout() {
   if (imageResponseTimer) {
     window.clearTimeout(imageResponseTimer);
@@ -140,7 +300,7 @@ function scheduleImageRetry(base64Data) {
 
     const alternatePayload = {
       message: JSON.stringify({
-        prompt: PROMPT,
+        prompt: activePrompt,
         imageBase64: base64Data
       }),
       useLLM: true,
@@ -462,8 +622,8 @@ function postToMagicPhoto(imageDataUrl) {
     pluginId: IMAGE_PLUGIN_ID,
     imageBase64: dataUrl
   };
-  if (PROMPT && PROMPT.trim()) {
-    payload.message = PROMPT;
+  if (activePrompt && activePrompt.trim()) {
+    payload.message = activePrompt;
   }
 
   updateDebug(`[SEND] ${Math.round(dataUrl.length / 1024)}KB image pluginId=${IMAGE_PLUGIN_ID}`);
@@ -700,6 +860,32 @@ if (llmTestButtonEl) {
   });
 }
 
+if (themeButtonEl) {
+  themeButtonEl.addEventListener("click", () => {
+    openThemeModal();
+  });
+}
+
+if (themeCloseButtonEl) {
+  themeCloseButtonEl.addEventListener("click", () => {
+    closeThemeModal();
+  });
+}
+
+if (themeModalEl) {
+  themeModalEl.addEventListener("click", event => {
+    if (event.target === themeModalEl) {
+      closeThemeModal();
+    }
+  });
+}
+
+window.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    closeThemeModal();
+  }
+});
+
 window.addEventListener("beforeunload", stopStream);
 window.addEventListener("beforeunload", clearImageResponseTimeout);
 window.addEventListener("beforeunload", clearImageRetryTimeout);
@@ -724,6 +910,8 @@ window.addEventListener("keydown", event => {
 renderCameraLabel();
 showStartUi();
 setStatus("Waiting for camera start...", false);
+setThemeLabel();
+loadPhotoThemes();
 
 const buildIdEl = document.getElementById("build-id");
 if (buildIdEl) buildIdEl.textContent = `build ${BUILD}`;

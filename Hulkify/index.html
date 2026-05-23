@@ -13,8 +13,20 @@
       <div class="start-title">Gamma Camera</div>
       <div id="build-id" class="build-id"></div>
       <div id="start-text" class="start-text">Press side button or tap Start to enable the camera.</div>
+      <button id="theme-button" class="start-button secondary" type="button">SELECT THEME</button>
+      <div id="theme-current" class="theme-current">Theme: loading...</div>
       <button id="start-button" class="start-button" type="button">START CAMERA</button>
       <button id="llm-test-button" class="start-button secondary" type="button">TEST LLM (TIME)</button>
+    </div>
+
+    <div id="theme-modal" class="theme-modal" aria-hidden="true">
+      <div class="theme-modal-card" role="dialog" aria-modal="true" aria-labelledby="theme-modal-title">
+        <div class="theme-modal-header">
+          <div id="theme-modal-title" class="theme-modal-title">Select Photo Theme</div>
+          <button id="theme-close-button" class="theme-close-button" type="button" aria-label="Close theme selector">X</button>
+        </div>
+        <div id="theme-list" class="theme-list"></div>
+      </div>
     </div>
 
     <video id="viewfinder" autoplay playsinline muted></video>

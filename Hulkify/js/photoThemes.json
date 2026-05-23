@@ -1,0 +1,45 @@
+{
+  "themes": [
+    {
+      "title": "Cyberpunk",
+      "prompt": "Take a picture in a cyberpunk style with neon colors, tech elements, and futuristic vibes."
+    },
+    {
+      "title": "Caricature",
+      "prompt": "Take a picture and make it a caricature. Defined by exaggerated features, bold expressions, and a humorous twist while preserving likeness. It captures the essence of a person or scene in a fun, over-the-top way, like something you would get from a street artist at a fair, bursting with personality and charm."
+    },
+    {
+      "title": "Van Gogh",
+      "prompt": "Take a picture and make it look like a Van Gogh painting, with bold brushstrokes, vibrant colors, and emotional intensity. Capture the essence of the subject while infusing it with the unique style and energy that Van Gogh is known for."
+    },
+    {
+      "title": "Pixel Art",
+      "prompt": "Take a picture and convert it into pixel art style, characterized by its blocky, low-resolution aesthetic. The image should be transformed into a grid of pixels, with simplified shapes and a limited color palette, reminiscent of classic video game graphics."
+    },
+    {
+      "title": "Watercolor",
+      "prompt": "Take a picture and render it in a watercolor style, featuring soft, flowing brushstrokes, subtle color blending, and a dreamy, ethereal quality. The image should evoke the delicate and translucent nature of traditional watercolor paintings."
+    },
+    {
+      "title": "Pop Art",
+      "prompt": "Take a picture and transform it into a pop art style, characterized by bold colors, strong lines, and a sense of irony or satire. The image should be reminiscent of the works of artists like Andy Warhol and Roy Lichtenstein, with a focus on popular culture and mass media."
+    },
+    {
+      "title": "Surrealism",
+      "prompt": "Take a picture and transform it into a surrealist style, characterized by dream-like scenes, unexpected juxtapositions, and imaginative elements. The image should evoke a sense of wonder and challenge the viewer's perception of reality."
+    },
+    {
+      "title": "Huklify",
+      "prompt": "Take a picture and apply the Hulkify theme, which exaggerates features and adds a green tint to create a fun and playful transformation. The image should capture the essence of the original while giving it a humorous and larger-than-life appearance, reminiscent of the Hulk character from comics and movies."
+    },
+    {
+      "title": "1950s Seaside Postcard",
+      "prompt": "Take a picture and transform it into a 1950s seaside postcard style, characterized by bright, saturated colors, a slightly faded or distressed look, and a nostalgic, vintage feel. The image should evoke the charm and simplicity of mid-20th century beach scenes, with elements like sandy shores, ocean waves, and classic beach attire.",
+      "default": true
+    },
+    {
+      "title": "Startrek TNG",
+      "prompt": "Take a picture and transform it into the style of Star Trek: The Next Generation, characterized by its futuristic and sleek design elements. The image should evoke the aesthetic of the 24th century, with clean lines, advanced technology, and a sense of exploration and optimism. Style cues can be drawn from the show's iconic uniforms, starship interiors, and the overall visual language of the series."
+    }
+  ]
+}
