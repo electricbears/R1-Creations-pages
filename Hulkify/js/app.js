@@ -1,9 +1,11 @@
-const BUILD = "2026-05-23b";
+const BUILD = "2026-05-23c";
 const THEME_STORAGE_KEY = "hulkify.selectedThemeTitle";
 const DEFAULT_PROMPT = "Take a picture in a cyberpunk style with neon colors, tech elements, and futuristic vibes.";
 const LLM_TIME_TEST_PROMPT = "what time is it?";
 const IMAGE_PLUGIN_ID = "com.r1.pixelart";
 const IMAGE_RESPONSE_TIMEOUT_MS = 60000;
+const WHEEL_GESTURE_COOLDOWN_MS = 450;
+const SIDE_DOUBLE_TAP_MS = 350;
 const CAMERA_ORDER = ["environment", "user"];
 const CAMERA_PROFILES = {
   environment: {
@@ -56,6 +58,9 @@ let photoThemes = [];
 let activeTheme = null;
 let activePrompt = DEFAULT_PROMPT;
 let themeSelectionIndex = 0;
+let lastWheelActionAt = 0;
+let lastSideClickAt = 0;
+let sideClickTimer = null;
 
 function updateDebug(message) {
   debugLog.push(message);
@@ -412,6 +417,12 @@ function showStartUi() {
 }
 
 function handleWheelNavigation(direction) {
+  const now = Date.now();
+  if (now - lastWheelActionAt < WHEEL_GESTURE_COOLDOWN_MS) {
+    return;
+  }
+  lastWheelActionAt = now;
+
   if (getThemeModalIsOpen()) {
     moveThemeSelection(direction > 0 ? 1 : -1);
     return;
@@ -421,16 +432,77 @@ function handleWheelNavigation(direction) {
     return;
   }
 
-  switchCamera(direction);
+  switchCamera(1);
 }
 
-function handleSideClickAction() {
+function attemptExitToHome() {
+  updateDebug("[EXIT] Attempting to return to home");
+
+  if (typeof PluginMessageHandler !== "undefined" && PluginMessageHandler && typeof PluginMessageHandler.postMessage === "function") {
+    const exitPayloads = [
+      { action: "close" },
+      { action: "exit" },
+      { type: "close" },
+      { type: "exit" },
+      { command: "close" },
+      { command: "exit" }
+    ];
+
+    for (const payload of exitPayloads) {
+      try {
+        PluginMessageHandler.postMessage(JSON.stringify(payload));
+      } catch (_error) {
+        // Continue through fallback options.
+      }
+    }
+  }
+
+  try {
+    if (window.parent && window.parent !== window && typeof window.parent.postMessage === "function") {
+      window.parent.postMessage({ action: "close" }, "*");
+      window.parent.postMessage({ action: "exit" }, "*");
+    }
+  } catch (_error) {
+    // Ignore cross-context failures.
+  }
+
+  if (window.history.length > 1) {
+    window.history.back();
+    return;
+  }
+
+  if (typeof window.close === "function") {
+    window.close();
+  }
+}
+
+function runSingleSideClickAction() {
+  sideClickTimer = null;
+
   if (getThemeModalIsOpen()) {
     selectHighlightedTheme();
     return;
   }
 
   takePhotoAndSubmit();
+}
+
+function handleSideClickAction() {
+  const now = Date.now();
+  if (now - lastSideClickAt <= SIDE_DOUBLE_TAP_MS) {
+    if (sideClickTimer) {
+      window.clearTimeout(sideClickTimer);
+      sideClickTimer = null;
+    }
+    lastSideClickAt = 0;
+    attemptExitToHome();
+    return;
+  }
+
+  lastSideClickAt = now;
+  sideClickTimer = window.setTimeout(() => {
+    runSingleSideClickAction();
+  }, SIDE_DOUBLE_TAP_MS);
 }
 
 function getCameraFacingMode() {
