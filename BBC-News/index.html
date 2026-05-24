@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>BBC News LCARS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <div class="lcars-header">
+      <span class="lcars-label">BBC NEWS FEED</span>
+      <span class="lcars-label right" id="build-label">BUILD</span>
+    </div>
+
+    <div class="lcars-main">
+      <div class="lcars-sidebar" id="category-list" aria-label="BBC categories"></div>
+
+      <div class="lcars-display">
+        <div class="lcars-mode-row">
+          <div class="lcars-mode" id="mode-label">CATEGORY: TOP STORIES</div>
+          <div class="lcars-focus" id="focus-label">FOCUS: CATEGORIES</div>
+        </div>
+
+        <div class="lcars-readout" id="primary-readout">Synchronizing BBC feed...</div>
+        <div class="lcars-readout small" id="secondary-readout">Wheel navigates. Side button changes focus.</div>
+
+        <div class="news-panels">
+          <section class="news-panel headline-panel" aria-labelledby="headline-panel-title">
+            <div class="panel-header" id="headline-panel-title">HEADLINES</div>
+            <div id="headline-list" class="scroll-panel headline-list" aria-live="polite"></div>
+          </section>
+
+          <section class="news-panel article-panel" aria-labelledby="article-title">
+            <div class="article-topline">
+              <div id="article-title" class="article-title">Select a headline</div>
+              <a id="article-link" class="article-link" href="https://www.bbc.com/news" target="_blank" rel="noreferrer">OPEN</a>
+            </div>
+            <div id="article-meta" class="article-meta">BBC / Awaiting selection</div>
+            <div id="article-body" class="scroll-panel article-body">Choose a category, then a headline, to read the article text here.</div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div class="lcars-footer">
+      <span class="lcars-label" id="status-label">IDLE</span>
+      <span class="lcars-label right" id="timestamp-label">--:--</span>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
