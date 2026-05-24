@@ -2,6 +2,9 @@ const MODES = ["lifeform", "atmosphere", "diagnostics", "medical", "settings"];
 let currentModeIndex = 0;
 const SETTINGS_STORAGE_KEY = "tricorder-settings-v1";
 
+// Home location fallback for when GPS is unavailable
+const HOME_LOCATION = { latitude: 53.117252, longitude: -2.939227 };
+
 const modeLabel = document.getElementById("mode-label");
 const primaryReadout = document.getElementById("primary-readout");
 const secondaryReadout = document.getElementById("secondary-readout");
@@ -1176,13 +1179,19 @@ async function runLifeformScan(container = graphArea, options = {}) {
       await getGPSLocation();
       primaryReadout.textContent = "GPS acquired. Loading aircraft data...";
     } catch (err) {
-      primaryReadout.textContent = "GPS unavailable. Falling back to simulated scan.";
-      secondaryReadout.textContent = err.message;
-      // Continue with simulated data as fallback
-      if (lifeformRadarState) {
-        seedLifeformContacts(lifeformRadarState);
+      // Try home location fallback
+      if (HOME_LOCATION) {
+        primaryReadout.textContent = "Using home location...";
+        userLocation = HOME_LOCATION;
+      } else {
+        primaryReadout.textContent = "GPS unavailable. Falling back to simulated scan.";
+        secondaryReadout.textContent = err.message;
+        // Continue with simulated data as fallback
+        if (lifeformRadarState) {
+          seedLifeformContacts(lifeformRadarState);
+        }
+        return;
       }
-      return;
     }
   }
 
