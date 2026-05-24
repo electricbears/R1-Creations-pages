@@ -785,13 +785,24 @@ async function fetchAircraftData() {
 
   const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
   
+  // Determine if running on localhost (skip direct fetch due to CORS)
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  
   // Try multiple CORS proxy options in order of reliability
-  const corsProxies = [
-    url, // Try direct first (works on GitHub Pages)
-    `https://cors.bridged.cc/${url}`,
-    `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
-  ];
+  const corsProxies = isLocalhost 
+    ? [
+        // Skip direct fetch on localhost; go straight to proxies
+        `https://cors.bridged.cc/${url}`,
+        `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+      ]
+    : [
+        // On GitHub Pages, try direct first
+        url,
+        `https://cors.bridged.cc/${url}`,
+        `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+      ];
 
   let lastError = null;
   for (const proxyUrl of corsProxies) {
@@ -838,7 +849,7 @@ async function fetchAircraftData() {
   
   // All proxies failed
   console.error("Aircraft fetch error after all attempts:", lastError);
-  throw new Error("Unable to fetch live aircraft data. (For local development, use GitHub Pages or configure a CORS proxy)");
+  throw new Error("Unable to fetch live aircraft data. (Local testing: use GitHub Pages or install a CORS browser extension)");
 }
 
 // Convert aircraft state vector to radar contact parameters
