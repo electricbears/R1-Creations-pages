@@ -28,6 +28,71 @@ let aircraftCache = [];   // cached aircraft data with timestamp
 let radarModalOverlay = null;
 let radarModalStage = null;
 let radarModalOpen = false;
+let pendingLocationRequest = null;
+
+function normalizeLocationPayload(payload) {
+  if (!payload) {
+    return null;
+  }
+
+  const candidate = typeof payload === "string"
+    ? (() => {
+      try {
+        return JSON.parse(payload);
+      } catch (_err) {
+        return null;
+      }
+    })()
+    : payload;
+
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+
+  const location = candidate.location && typeof candidate.location === "object"
+    ? candidate.location
+    : candidate.coords && typeof candidate.coords === "object"
+      ? candidate.coords
+      : candidate;
+
+  const latitude = Number(location.latitude ?? location.lat);
+  const longitude = Number(location.longitude ?? location.lon ?? location.lng);
+  const accuracy = Number(location.accuracy ?? candidate.accuracy);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
+  }
+
+  return {
+    latitude,
+    longitude,
+    accuracy: Number.isFinite(accuracy) ? accuracy : null
+  };
+}
+
+function resolvePendingLocation(location) {
+  if (pendingLocationRequest) {
+    clearTimeout(pendingLocationRequest.timeoutId);
+    pendingLocationRequest.resolve(location);
+    pendingLocationRequest = null;
+  }
+}
+
+function rejectPendingLocation(error) {
+  if (pendingLocationRequest) {
+    clearTimeout(pendingLocationRequest.timeoutId);
+    pendingLocationRequest.reject(error);
+    pendingLocationRequest = null;
+  }
+}
+
+window.onPluginMessage = function(data) {
+  const location = normalizeLocationPayload(data);
+  if (location) {
+    userLocation = location;
+    resolvePendingLocation(location);
+  }
+};
 
 const MEDICAL_ZONES = [
   {
@@ -529,7 +594,42 @@ function clamp(value, min, max) {
 }
 
 // GPS and Aircraft Radar Functions
-function getGPSLocation() {
+function requestRabbitLocation() {
+  return new Promise((resolve, reject) => {
+    if (typeof PluginMessageHandler === "undefined") {
+      reject(new Error("Rabbit bridge unavailable"));
+      return;
+    }
+
+    const requestId = `location-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    pendingLocationRequest = {
+      resolve,
+      reject,
+      timeoutId: window.setTimeout(() => {
+        rejectPendingLocation(new Error("Rabbit location request timed out"));
+      }, 8000)
+    };
+
+    try {
+      PluginMessageHandler.postMessage(
+        JSON.stringify({
+          type: "location",
+          action: "current",
+          requestId,
+          message: "Return the current GPS location as JSON with latitude, longitude, and accuracy only.",
+          useLLM: false,
+          wantsR1Response: true,
+          wantsJournalEntry: false
+        })
+      );
+    } catch (err) {
+      rejectPendingLocation(err);
+      reject(err);
+    }
+  });
+}
+
+function getBrowserLocation() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error("Geolocation not available"));
@@ -545,9 +645,31 @@ function getGPSLocation() {
         resolve(userLocation);
       },
       error => reject(error),
-      { timeout: 10000, maximumAge: 300000 }  // 5 min cache
+      { timeout: 15000, maximumAge: 0, enableHighAccuracy: true }
     );
   });
+}
+
+async function getGPSLocation() {
+  if (userLocation) {
+    return userLocation;
+  }
+
+  if (typeof isR1Runtime === "function" && isR1Runtime()) {
+    try {
+      const location = await requestRabbitLocation();
+      if (location) {
+        userLocation = location;
+        return userLocation;
+      }
+    } catch (_err) {
+      // Fall back to browser geolocation below.
+    }
+  }
+
+  const location = await getBrowserLocation();
+  userLocation = location;
+  return userLocation;
 }
 
 // Calculate bearing (0-360 degrees) from user to target
