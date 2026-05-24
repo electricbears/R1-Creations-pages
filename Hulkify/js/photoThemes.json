@@ -38,6 +38,24 @@
       "default": true
     },
     {
+        "title": "Film Noir",
+        "prompt": "Take a picture and transform it into a film noir style, characterized by high contrast, dramatic lighting, and a moody, atmospheric quality. The image should evoke the dark and gritty aesthetic of classic film noir movies, with deep shadows, stark highlights, and a sense of mystery and intrigue."        
+    },
+    {
+        "title": "Steampunk",
+        "prompt": "Take a picture and transform it into a steampunk style, characterized by a blend of Victorian-era aesthetics and steam-powered technology. The image should evoke a sense of retro-futurism, with elements like gears, cogs, brass fittings, and an overall industrial yet whimsical vibe."
+
+    },
+    {
+        "title": "Ghibli",
+        "prompt": "Take a picture and transform it into the style of Studio Ghibli, characterized by its whimsical and detailed animation. The image should evoke the magical and heartwarming aesthetic of Ghibli films, with soft colors, intricate backgrounds, and a sense of wonder and nostalgia."
+        
+    },
+    {
+        "title": "1970s Saucy Postcard",
+        "prompt": "Take a picture and transform it into a vintage British seaside comic postcard style: bold cartoon illustration, exaggerated expressions, bright flat colours, cheeky innuendo, playful humour, buxom characters, henpecked husbands, bustling promenade atmosphere, 1960s–70s saucy postcard aesthetic, simple layout with a punchline vibe, lighthearted and mischievous tone as provided by artists like Donald McGill and Stanley James, capturing the nostalgic charm and cheeky humor of classic British seaside postcards."
+    },
+    {
       "title": "Startrek TNG",
       "prompt": "Take a picture and transform it into the style of Star Trek: The Next Generation, characterized by its futuristic and sleek design elements. The image should evoke the aesthetic of the 24th century, with clean lines, advanced technology, and a sense of exploration and optimism. Style cues can be drawn from the show's iconic uniforms, starship interiors, and the overall visual language of the series."
     }
