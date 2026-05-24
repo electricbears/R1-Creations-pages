@@ -215,74 +215,113 @@ body {
   text-shadow: 0 0 5px rgba(102, 204, 255, 0.75);
 }
 
-.radar-popout-view {
-  position: relative;
-  width: 100%;
-  height: 100%;
+.radar-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  box-sizing: border-box;
 }
 
-.radar-popout-view .radar-view {
-  width: 96%;
+.radar-modal-card {
+  width: min(100%, 950px);
+  height: min(100%, 950px);
+  border-radius: 16px;
+  border: 1px solid rgba(102, 204, 255, 0.42);
+  background: linear-gradient(180deg, rgba(8, 10, 16, 0.98), rgba(2, 4, 8, 0.98));
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.radar-popout-close {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  z-index: 5;
+.radar-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: linear-gradient(90deg, #ff9966, #ffcc66);
+  color: #110e0a;
+}
+
+.radar-modal-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.radar-modal-close {
   border: 0;
   border-radius: 999px;
-  background: #ff9966;
-  color: #110e0a;
+  background: #111;
+  color: #ffcc66;
   font-size: 9px;
   font-weight: 700;
   padding: 5px 10px;
   cursor: pointer;
 }
 
-.radar-popout-close:focus-visible {
+.radar-modal-close:focus-visible {
   outline: 1px solid #66ccff;
   outline-offset: 2px;
 }
 
-body.radar-popout {
+.radar-modal-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
-body.radar-popout #app {
-  width: 100vw;
-  height: 100vh;
+.radar-inline-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
-body.radar-popout .lcars-main {
-  padding: 8px;
+.radar-modal-stage .radar-view,
+.radar-inline-stage .radar-view {
+  width: 96%;
 }
 
-body.radar-popout .lcars-sidebar {
+.radar-view.radar-large {
+  width: 96%;
+}
+
+body.radar-modal-open {
+  overflow: hidden;
+}
+
+body.radar-modal-open .lcars-sidebar {
   display: none;
 }
 
-body.radar-popout .lcars-display {
+body.radar-modal-open .lcars-display {
   padding: 8px;
 }
 
-body.radar-popout .lcars-readout,
-body.radar-popout .lcars-readout.small {
+body.radar-modal-open .lcars-readout,
+body.radar-modal-open .lcars-readout.small {
   font-size: 12px;
   max-height: none;
   min-height: auto;
 }
 
-body.radar-popout .lcars-mode {
+body.radar-modal-open .lcars-mode {
   font-size: 12px;
 }
 
-body.radar-popout .lcars-header,
-body.radar-popout .lcars-footer {
+body.radar-modal-open .lcars-header,
+body.radar-modal-open .lcars-footer {
   font-size: 12px;
 }
 
-body.radar-popout .radar-contact-label {
+body.radar-modal-open .radar-contact-label {
   font-size: 12px;
 }
 

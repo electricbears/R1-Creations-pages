@@ -25,11 +25,9 @@ const appSettings = {
 
 let userLocation = null;  // { latitude, longitude, accuracy }
 let aircraftCache = [];   // cached aircraft data with timestamp
-const RADAR_SNAPSHOT_KEY = "tricorder-radar-snapshot-v1";
-const RADAR_POPUP_QUERY = "radarPopout";
-
-const isRadarPopout = new URLSearchParams(window.location.search).get(RADAR_POPUP_QUERY) === "1";
-let radarPopoutWindow = null;
+let radarModalOverlay = null;
+let radarModalStage = null;
+let radarModalOpen = false;
 
 const MEDICAL_ZONES = [
   {
@@ -585,64 +583,63 @@ function setContactOpacity(contact, opacity) {
   }
 }
 
-function captureRadarSnapshot(radarState) {
-  if (!radarState) {
-    return null;
-  }
-
-  return {
-    createdAt: Date.now(),
-    angle: radarState.angle,
-    currentCount: radarState.currentCount,
-    maxCount: radarState.maxCount,
-    contacts: radarState.contacts.map(contact => ({
-      angle: contact.angle,
-      radiusPct: contact.radiusPct,
-      displayAngle: contact.displayAngle,
-      displayRadiusPct: contact.displayRadiusPct,
-      callsign: contact.callsign || null,
-      altitude: contact.altitude || null,
-      velocity: contact.velocity || null,
-      distance: contact.distance || null,
-      isAircraft: contact.isAircraft === true,
-      opacity: Number.parseFloat(contact.marker.style.opacity || "0")
-    }))
-  };
-}
-
-function saveRadarSnapshot(snapshot) {
-  try {
-    if (!snapshot) {
-      localStorage.removeItem(RADAR_SNAPSHOT_KEY);
-      return;
-    }
-    localStorage.setItem(RADAR_SNAPSHOT_KEY, JSON.stringify(snapshot));
-  } catch (_err) {
-    // Ignore storage failures.
-  }
-}
-
-function loadRadarSnapshot() {
-  try {
-    const raw = localStorage.getItem(RADAR_SNAPSHOT_KEY);
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw);
-    return parsed && Array.isArray(parsed.contacts) ? parsed : null;
-  } catch (_err) {
-    return null;
-  }
-}
-
-function openRadarPopoutWindow() {
-  if (isRadarPopout) {
+function closeRadarModal() {
+  if (!radarModalOpen) {
     return;
   }
 
-  const url = new URL(window.location.href);
-  url.searchParams.set(RADAR_POPUP_QUERY, "1");
-  radarPopoutWindow = window.open(url.toString(), "tricorder-radar-popout", "width=980,height=980,resizable=yes,scrollbars=no");
+  radarModalOpen = false;
+  document.body.classList.remove("radar-modal-open");
+  stopLifeformRadar();
+  lifeformScanActive = false;
+
+  if (radarModalOverlay && radarModalOverlay.parentNode) {
+    radarModalOverlay.parentNode.removeChild(radarModalOverlay);
+  }
+
+  radarModalOverlay = null;
+  radarModalStage = null;
+  renderLifeformRadar({ animateSweep: false, container: graphArea });
+}
+
+function openRadarModal() {
+  if (radarModalOpen) {
+    return;
+  }
+
+  radarModalOpen = true;
+  document.body.classList.add("radar-modal-open");
+
+  radarModalOverlay = document.createElement("div");
+  radarModalOverlay.className = "radar-modal-overlay";
+
+  const modalCard = document.createElement("div");
+  modalCard.className = "radar-modal-card";
+
+  const modalHeader = document.createElement("div");
+  modalHeader.className = "radar-modal-header";
+  modalHeader.innerHTML = `
+    <div class="radar-modal-title">AIRCRAFT RADAR</div>
+    <button type="button" class="radar-modal-close">CLOSE</button>
+  `;
+
+  radarModalStage = document.createElement("div");
+  radarModalStage.className = "radar-modal-stage";
+
+  modalCard.appendChild(modalHeader);
+  modalCard.appendChild(radarModalStage);
+  radarModalOverlay.appendChild(modalCard);
+  document.body.appendChild(radarModalOverlay);
+
+  const closeButton = modalHeader.querySelector(".radar-modal-close");
+  closeButton.addEventListener("click", closeRadarModal);
+  radarModalOverlay.addEventListener("click", event => {
+    if (event.target === radarModalOverlay) {
+      closeRadarModal();
+    }
+  });
+
+  runLifeformScan(radarModalStage, { modal: true });
 }
 
 // Fetch aircraft from OpenSky Network API
@@ -920,14 +917,18 @@ function isSweepPassing(lastAngle, currentAngle, targetAngle) {
 
 function renderLifeformRadar(options = {}) {
   const animateSweep = options.animateSweep === true;
-  const snapshot = options.snapshot || null;
-  const popout = options.popout === true || isRadarPopout;
-  graphArea.innerHTML = "";
-  graphArea.classList.remove("medical-view");
-  graphArea.classList.toggle("radar-popout-view", popout);
+  const container = options.container || graphArea;
+  const largeRadar = options.large === true;
+  container.innerHTML = "";
+  container.classList.remove("medical-view");
+  container.classList.toggle("radar-modal-stage", container === radarModalStage);
+  container.classList.toggle("radar-inline-stage", container === graphArea);
 
   const radar = document.createElement("div");
   radar.className = "radar-view";
+  if (largeRadar) {
+    radar.classList.add("radar-large");
+  }
   radar.innerHTML = `
     <div class="radar-ring ring-1"></div>
     <div class="radar-ring ring-2"></div>
@@ -938,68 +939,7 @@ function renderLifeformRadar(options = {}) {
     <div class="radar-sweep-hand"></div>
   `;
 
-  graphArea.appendChild(radar);
-
-  if (popout) {
-    const closeButton = document.createElement("button");
-    closeButton.type = "button";
-    closeButton.className = "radar-popout-close";
-    closeButton.textContent = "CLOSE";
-    closeButton.addEventListener("click", () => {
-      try {
-        window.close();
-      } catch (_err) {
-        // Ignore window close failures.
-      }
-    });
-    graphArea.appendChild(closeButton);
-  }
-
-  if (snapshot && Array.isArray(snapshot.contacts)) {
-    lifeformRadarState = {
-      radar,
-      sweepHand: radar.querySelector(".radar-sweep-hand"),
-      angle: snapshot.angle || 0,
-      lastAngle: snapshot.angle || 0,
-      lastTick: performance.now(),
-      lastPingAt: -Infinity,
-      scanStartedAt: performance.now(),
-      contacts: [],
-      currentCount: snapshot.currentCount || 0,
-      maxCount: snapshot.maxCount || 0,
-      sweeps: 0
-    };
-
-    lifeformRadarState.sweepHand.style.display = "none";
-
-    snapshot.contacts.forEach(savedContact => {
-      const contact = savedContact.isAircraft
-        ? createAircraftContact(lifeformRadarState, {
-          angle: savedContact.angle,
-          radiusPct: savedContact.radiusPct,
-          callsign: savedContact.callsign || "UNKNOWN",
-          altitude: savedContact.altitude || 0,
-          velocity: savedContact.velocity || 0,
-          distance: savedContact.distance || 0,
-          angularVelocity: 0,
-          radialVelocity: 0
-        })
-        : createLifeformContact(lifeformRadarState, {
-          angle: savedContact.angle,
-          radiusPct: savedContact.radiusPct,
-          angularVelocity: 0,
-          radialVelocity: 0
-        });
-
-      contact.displayAngle = savedContact.displayAngle ?? savedContact.angle;
-      contact.displayRadiusPct = savedContact.displayRadiusPct ?? savedContact.radiusPct;
-      updateRadarMarkerPosition(contact);
-      setContactOpacity(contact, savedContact.opacity ?? 1);
-      lifeformRadarState.contacts.push(contact);
-    });
-
-    return;
-  }
+  container.appendChild(radar);
 
   const sweepHand = radar.querySelector(".radar-sweep-hand");
   if (!animateSweep) {
@@ -1023,16 +963,14 @@ function renderLifeformRadar(options = {}) {
 
   seedLifeformContacts(lifeformRadarState);
 
-  if (!popout) {
+  if (container === graphArea) {
     radar.addEventListener("pointerup", event => {
-      if (!lifeformScanActive || isRadarPopout) {
+      if (!lifeformScanActive || radarModalOpen) {
         return;
       }
       event.preventDefault();
-      const snapshotData = captureRadarSnapshot(lifeformRadarState);
-      saveRadarSnapshot(snapshotData);
-      stopLifeformScan(snapshotData);
-      openRadarPopoutWindow();
+      stopLifeformScan();
+      openRadarModal();
     }, { passive: false });
   }
 
@@ -1102,12 +1040,9 @@ function renderLifeformRadar(options = {}) {
   activeLifeformFrame = requestAnimationFrame(tick);
 }
 
-async function runLifeformScan() {
-  if (isRadarPopout) {
-    return;
-  }
-
-  renderLifeformRadar({ animateSweep: true });
+async function runLifeformScan(container = graphArea, options = {}) {
+  const modal = options.modal === true;
+  renderLifeformRadar({ animateSweep: true, container, large: modal });
   lifeformScanActive = true;
   primaryReadout.textContent = "Sweeping for aircraft...";
   secondaryReadout.textContent = "Rotational sensor sweep active. Press scan again to stop.";
@@ -1147,21 +1082,25 @@ async function runLifeformScan() {
   }
 }
 
-function stopLifeformScan(snapshotOverride = null) {
+function stopLifeformScan() {
   if (!lifeformScanActive) {
     return;
   }
 
-  const snapshot = snapshotOverride || captureRadarSnapshot(lifeformRadarState);
-  const count = snapshot ? snapshot.currentCount || snapshot.contacts.length : (lifeformRadarState ? lifeformRadarState.currentCount : randomInt(1, 7));
-  const peak = snapshot ? snapshot.maxCount || count : (lifeformRadarState ? lifeformRadarState.maxCount : count);
+  if (radarModalOpen) {
+    closeRadarModal();
+    return;
+  }
+
+  const currentRadarState = lifeformRadarState;
+  const count = currentRadarState ? currentRadarState.currentCount : randomInt(1, 7);
+  const peak = currentRadarState ? currentRadarState.maxCount : count;
 
   stopLifeformRadar();
-  saveRadarSnapshot(snapshot);
-  renderLifeformRadar({ animateSweep: false, snapshot, popout: false });
+  renderLifeformRadar({ animateSweep: false, container: graphArea });
   lifeformScanActive = false;
 
-  if (count > 0 && snapshot && snapshot.contacts.some(c => c.isAircraft)) {
+  if (count > 0 && currentRadarState && currentRadarState.contacts.some(c => c.isAircraft)) {
     primaryReadout.textContent = `Aircraft detected: ${count} contact(s) within ${appSettings.radarDistance} miles.`;
     secondaryReadout.textContent = "Radar sweep complete. Aircraft positions relative to current location.";
     if (peak !== count) {
@@ -1522,18 +1461,5 @@ if (navigator.geolocation) {
   });
 }
 
-if (isRadarPopout) {
-  document.body.classList.add("radar-popout");
-  const savedSnapshot = loadRadarSnapshot();
-  if (savedSnapshot) {
-    renderLifeformRadar({ animateSweep: false, snapshot: savedSnapshot, popout: true });
-    primaryReadout.textContent = "Radar snapshot.";
-    secondaryReadout.textContent = "Close this window to return.";
-    statusLabel.textContent = "PAUSED";
-  } else {
-    renderLifeformRadar({ animateSweep: false, popout: true });
-  }
-} else {
-  updateModeUI();
-}
+updateModeUI();
 
