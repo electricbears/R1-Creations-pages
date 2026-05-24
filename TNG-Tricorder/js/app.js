@@ -25,6 +25,11 @@ const appSettings = {
 
 let userLocation = null;  // { latitude, longitude, accuracy }
 let aircraftCache = [];   // cached aircraft data with timestamp
+const RADAR_SNAPSHOT_KEY = "tricorder-radar-snapshot-v1";
+const RADAR_POPUP_QUERY = "radarPopout";
+
+const isRadarPopout = new URLSearchParams(window.location.search).get(RADAR_POPUP_QUERY) === "1";
+let radarPopoutWindow = null;
 
 const MEDICAL_ZONES = [
   {
@@ -572,6 +577,74 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+function setContactOpacity(contact, opacity) {
+  const nextOpacity = `${clamp(opacity, 0, 1)}`;
+  contact.marker.style.opacity = nextOpacity;
+  if (contact.label) {
+    contact.label.style.opacity = nextOpacity;
+  }
+}
+
+function captureRadarSnapshot(radarState) {
+  if (!radarState) {
+    return null;
+  }
+
+  return {
+    createdAt: Date.now(),
+    angle: radarState.angle,
+    currentCount: radarState.currentCount,
+    maxCount: radarState.maxCount,
+    contacts: radarState.contacts.map(contact => ({
+      angle: contact.angle,
+      radiusPct: contact.radiusPct,
+      displayAngle: contact.displayAngle,
+      displayRadiusPct: contact.displayRadiusPct,
+      callsign: contact.callsign || null,
+      altitude: contact.altitude || null,
+      velocity: contact.velocity || null,
+      distance: contact.distance || null,
+      isAircraft: contact.isAircraft === true,
+      opacity: Number.parseFloat(contact.marker.style.opacity || "0")
+    }))
+  };
+}
+
+function saveRadarSnapshot(snapshot) {
+  try {
+    if (!snapshot) {
+      localStorage.removeItem(RADAR_SNAPSHOT_KEY);
+      return;
+    }
+    localStorage.setItem(RADAR_SNAPSHOT_KEY, JSON.stringify(snapshot));
+  } catch (_err) {
+    // Ignore storage failures.
+  }
+}
+
+function loadRadarSnapshot() {
+  try {
+    const raw = localStorage.getItem(RADAR_SNAPSHOT_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    return parsed && Array.isArray(parsed.contacts) ? parsed : null;
+  } catch (_err) {
+    return null;
+  }
+}
+
+function openRadarPopoutWindow() {
+  if (isRadarPopout) {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.set(RADAR_POPUP_QUERY, "1");
+  radarPopoutWindow = window.open(url.toString(), "tricorder-radar-popout", "width=980,height=980,resizable=yes,scrollbars=no");
+}
+
 // Fetch aircraft from OpenSky Network API
 async function fetchAircraftData() {
   if (!userLocation) {
@@ -685,8 +758,13 @@ async function loadAircraftContacts(radarState) {
 function createAircraftContact(radarState, contactParams) {
   const marker = document.createElement("div");
   marker.className = "radar-contact aircraft";
-  marker.style.opacity = "1";
+  marker.style.opacity = "0";
   marker.title = `${contactParams.callsign} @ ${Math.round(contactParams.altitude / 1000)}k ft`;
+
+  const label = document.createElement("div");
+  label.className = "radar-contact-label aircraft-label";
+  label.textContent = contactParams.callsign;
+  label.style.opacity = "0";
 
   const contact = {
     angle: contactParams.angle,
@@ -704,11 +782,13 @@ function createAircraftContact(radarState, contactParams) {
     exitStartedAt: null,
     exitStartOpacity: 0,
     marker: marker,
+    label,
     isAircraft: true
   };
 
   updateRadarMarkerPosition(contact);
   radarState.radar.appendChild(marker);
+  radarState.radar.appendChild(label);
   return contact;
 }
 
@@ -720,6 +800,10 @@ function updateRadarMarkerPosition(contact, useLivePosition = false) {
   const y = 50 + Math.sin(radians) * radiusPct;
   contact.marker.style.left = `${x}%`;
   contact.marker.style.top = `${y}%`;
+  if (contact.label) {
+    contact.label.style.left = `${x}%`;
+    contact.label.style.top = `${y}%`;
+  }
 }
 
 function createLifeformContact(radarState, options = {}) {
@@ -836,8 +920,11 @@ function isSweepPassing(lastAngle, currentAngle, targetAngle) {
 
 function renderLifeformRadar(options = {}) {
   const animateSweep = options.animateSweep === true;
+  const snapshot = options.snapshot || null;
+  const popout = options.popout === true || isRadarPopout;
   graphArea.innerHTML = "";
   graphArea.classList.remove("medical-view");
+  graphArea.classList.toggle("radar-popout-view", popout);
 
   const radar = document.createElement("div");
   radar.className = "radar-view";
@@ -852,6 +939,67 @@ function renderLifeformRadar(options = {}) {
   `;
 
   graphArea.appendChild(radar);
+
+  if (popout) {
+    const closeButton = document.createElement("button");
+    closeButton.type = "button";
+    closeButton.className = "radar-popout-close";
+    closeButton.textContent = "CLOSE";
+    closeButton.addEventListener("click", () => {
+      try {
+        window.close();
+      } catch (_err) {
+        // Ignore window close failures.
+      }
+    });
+    graphArea.appendChild(closeButton);
+  }
+
+  if (snapshot && Array.isArray(snapshot.contacts)) {
+    lifeformRadarState = {
+      radar,
+      sweepHand: radar.querySelector(".radar-sweep-hand"),
+      angle: snapshot.angle || 0,
+      lastAngle: snapshot.angle || 0,
+      lastTick: performance.now(),
+      lastPingAt: -Infinity,
+      scanStartedAt: performance.now(),
+      contacts: [],
+      currentCount: snapshot.currentCount || 0,
+      maxCount: snapshot.maxCount || 0,
+      sweeps: 0
+    };
+
+    lifeformRadarState.sweepHand.style.display = "none";
+
+    snapshot.contacts.forEach(savedContact => {
+      const contact = savedContact.isAircraft
+        ? createAircraftContact(lifeformRadarState, {
+          angle: savedContact.angle,
+          radiusPct: savedContact.radiusPct,
+          callsign: savedContact.callsign || "UNKNOWN",
+          altitude: savedContact.altitude || 0,
+          velocity: savedContact.velocity || 0,
+          distance: savedContact.distance || 0,
+          angularVelocity: 0,
+          radialVelocity: 0
+        })
+        : createLifeformContact(lifeformRadarState, {
+          angle: savedContact.angle,
+          radiusPct: savedContact.radiusPct,
+          angularVelocity: 0,
+          radialVelocity: 0
+        });
+
+      contact.displayAngle = savedContact.displayAngle ?? savedContact.angle;
+      contact.displayRadiusPct = savedContact.displayRadiusPct ?? savedContact.radiusPct;
+      updateRadarMarkerPosition(contact);
+      setContactOpacity(contact, savedContact.opacity ?? 1);
+      lifeformRadarState.contacts.push(contact);
+    });
+
+    return;
+  }
 
   const sweepHand = radar.querySelector(".radar-sweep-hand");
   if (!animateSweep) {
@@ -875,6 +1023,19 @@ function renderLifeformRadar(options = {}) {
 
   seedLifeformContacts(lifeformRadarState);
 
+  if (!popout) {
+    radar.addEventListener("pointerup", event => {
+      if (!lifeformScanActive || isRadarPopout) {
+        return;
+      }
+      event.preventDefault();
+      const snapshotData = captureRadarSnapshot(lifeformRadarState);
+      saveRadarSnapshot(snapshotData);
+      stopLifeformScan(snapshotData);
+      openRadarPopoutWindow();
+    }, { passive: false });
+  }
+
   const tick = now => {
     if (!lifeformRadarState) {
       return;
@@ -894,10 +1055,13 @@ function renderLifeformRadar(options = {}) {
         const exitDuration = LIFEFORM_EXIT_FADE_STEPS * LIFEFORM_EXIT_FADE_MS_PER_STEP;
         const progress = (now - contact.exitStartedAt) / exitDuration;
         const fade = Math.max(0, contact.exitStartOpacity * (1 - progress));
-        contact.marker.style.opacity = fade.toFixed(3);
+        setContactOpacity(contact, fade);
         if (fade <= 0) {
           if (contact.marker.parentNode) {
             contact.marker.parentNode.removeChild(contact.marker);
+          }
+          if (contact.label && contact.label.parentNode) {
+            contact.label.parentNode.removeChild(contact.label);
           }
           contact.removePending = true;
         }
@@ -916,13 +1080,13 @@ function renderLifeformRadar(options = {}) {
         contact.displayRadiusPct = contact.radiusPct;
         updateRadarMarkerPosition(contact);
         contact.revealedAt = now;
-        contact.marker.style.opacity = "1";
+        setContactOpacity(contact, 1);
         playLifeformDetectionChirp(lifeformRadarState, now);
       }
 
       if (contact.revealedAt !== null) {
         const fade = Math.max(0, 1 - (now - contact.revealedAt) / LIFEFORM_SWEEP_FADE_MS);
-        contact.marker.style.opacity = fade.toFixed(3);
+        setContactOpacity(contact, fade);
       }
     });
 
@@ -939,6 +1103,10 @@ function renderLifeformRadar(options = {}) {
 }
 
 async function runLifeformScan() {
+  if (isRadarPopout) {
+    return;
+  }
+
   renderLifeformRadar({ animateSweep: true });
   lifeformScanActive = true;
   primaryReadout.textContent = "Sweeping for aircraft...";
@@ -979,19 +1147,21 @@ async function runLifeformScan() {
   }
 }
 
-function stopLifeformScan() {
+function stopLifeformScan(snapshotOverride = null) {
   if (!lifeformScanActive) {
     return;
   }
 
-  const count = lifeformRadarState ? lifeformRadarState.currentCount : randomInt(1, 7);
-  const peak = lifeformRadarState ? lifeformRadarState.maxCount : count;
+  const snapshot = snapshotOverride || captureRadarSnapshot(lifeformRadarState);
+  const count = snapshot ? snapshot.currentCount || snapshot.contacts.length : (lifeformRadarState ? lifeformRadarState.currentCount : randomInt(1, 7));
+  const peak = snapshot ? snapshot.maxCount || count : (lifeformRadarState ? lifeformRadarState.maxCount : count);
 
   stopLifeformRadar();
-  renderLifeformRadar({ animateSweep: false });
+  saveRadarSnapshot(snapshot);
+  renderLifeformRadar({ animateSweep: false, snapshot, popout: false });
   lifeformScanActive = false;
 
-  if (count > 0 && lifeformRadarState && lifeformRadarState.contacts.some(c => c.isAircraft)) {
+  if (count > 0 && snapshot && snapshot.contacts.some(c => c.isAircraft)) {
     primaryReadout.textContent = `Aircraft detected: ${count} contact(s) within ${appSettings.radarDistance} miles.`;
     secondaryReadout.textContent = "Radar sweep complete. Aircraft positions relative to current location.";
     if (peak !== count) {
@@ -1352,5 +1522,18 @@ if (navigator.geolocation) {
   });
 }
 
-updateModeUI();
+if (isRadarPopout) {
+  document.body.classList.add("radar-popout");
+  const savedSnapshot = loadRadarSnapshot();
+  if (savedSnapshot) {
+    renderLifeformRadar({ animateSweep: false, snapshot: savedSnapshot, popout: true });
+    primaryReadout.textContent = "Radar snapshot.";
+    secondaryReadout.textContent = "Close this window to return.";
+    statusLabel.textContent = "PAUSED";
+  } else {
+    renderLifeformRadar({ animateSweep: false, popout: true });
+  }
+} else {
+  updateModeUI();
+}
 

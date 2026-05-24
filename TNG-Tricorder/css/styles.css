@@ -198,6 +198,94 @@ body {
   opacity: 0;
 }
 
+.radar-contact-label {
+  position: absolute;
+  transform: translate(10px, -50%);
+  font-size: 8px;
+  line-height: 1;
+  white-space: nowrap;
+  color: #ffcc66;
+  text-shadow: 0 0 4px rgba(255, 204, 102, 0.55);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.radar-contact-label.aircraft-label {
+  color: #66ccff;
+  text-shadow: 0 0 5px rgba(102, 204, 255, 0.75);
+}
+
+.radar-popout-view {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.radar-popout-view .radar-view {
+  width: 96%;
+}
+
+.radar-popout-close {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  z-index: 5;
+  border: 0;
+  border-radius: 999px;
+  background: #ff9966;
+  color: #110e0a;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.radar-popout-close:focus-visible {
+  outline: 1px solid #66ccff;
+  outline-offset: 2px;
+}
+
+body.radar-popout {
+  overflow: hidden;
+}
+
+body.radar-popout #app {
+  width: 100vw;
+  height: 100vh;
+}
+
+body.radar-popout .lcars-main {
+  padding: 8px;
+}
+
+body.radar-popout .lcars-sidebar {
+  display: none;
+}
+
+body.radar-popout .lcars-display {
+  padding: 8px;
+}
+
+body.radar-popout .lcars-readout,
+body.radar-popout .lcars-readout.small {
+  font-size: 12px;
+  max-height: none;
+  min-height: auto;
+}
+
+body.radar-popout .lcars-mode {
+  font-size: 12px;
+}
+
+body.radar-popout .lcars-header,
+body.radar-popout .lcars-footer {
+  font-size: 12px;
+}
+
+body.radar-popout .radar-contact-label {
+  font-size: 12px;
+}
+
 .medical-view {
   position: relative;
   width: 100%;
