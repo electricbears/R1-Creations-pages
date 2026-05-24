@@ -19,8 +19,12 @@ let medicalAmbience = null;
 
 const appSettings = {
   systemSounds: true,
-  voice: true
-};
+  voice: true,
+  radarDistance: 12
+};  // radarDistance in miles
+
+let userLocation = null;  // { latitude, longitude, accuracy }
+let aircraftCache = [];   // cached aircraft data with timestamp
 
 const MEDICAL_ZONES = [
   {
@@ -92,6 +96,9 @@ function loadSettings() {
     }
     if (typeof parsed.voice === "boolean") {
       appSettings.voice = parsed.voice;
+    }
+    if (typeof parsed.radarDistance === "number") {
+      appSettings.radarDistance = parsed.radarDistance;
     }
   } catch (_err) {
     // Fall back to defaults if storage is unavailable or invalid.
@@ -518,6 +525,193 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+// GPS and Aircraft Radar Functions
+function getGPSLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocation not available"));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        userLocation = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        };
+        resolve(userLocation);
+      },
+      error => reject(error),
+      { timeout: 10000, maximumAge: 300000 }  // 5 min cache
+    );
+  });
+}
+
+// Calculate bearing (0-360 degrees) from user to target
+function calculateBearing(lat1, lon1, lat2, lon2) {
+  const toRad = Math.PI / 180;
+  const dLon = (lon2 - lon1) * toRad;
+  const lat1Rad = lat1 * toRad;
+  const lat2Rad = lat2 * toRad;
+  const y = Math.sin(dLon) * Math.cos(lat2Rad);
+  const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+  const bearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  return bearing;
+}
+
+// Calculate distance in miles using Haversine formula
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 3959;  // Earth radius in miles
+  const toRad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * toRad;
+  const dLon = (lon2 - lon1) * toRad;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Fetch aircraft from OpenSky Network API
+async function fetchAircraftData() {
+  if (!userLocation) {
+    throw new Error("GPS location not available");
+  }
+
+  const { latitude, longitude } = userLocation;
+  const radiusMiles = appSettings.radarDistance;
+  // Convert miles to degrees (approximate: 1 degree ≈ 69 miles)
+  const radiusDeg = radiusMiles / 69;
+
+  const lamin = latitude - radiusDeg;
+  const lamax = latitude + radiusDeg;
+  const lomin = longitude - radiusDeg;
+  const lomax = longitude + radiusDeg;
+
+  const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`OpenSky API error: ${response.status}`);
+    }
+    const data = await response.json();
+    if (!data.states || !Array.isArray(data.states)) {
+      return [];
+    }
+    // Filter valid aircraft with position data
+    return data.states.filter(state =>
+      state[5] !== null && state[6] !== null &&  // longitude and latitude
+      state[1] !== null  // callsign
+    );
+  } catch (err) {
+    console.error("Aircraft fetch error:", err);
+    throw err;
+  }
+}
+
+// Convert aircraft state vector to radar contact parameters
+function aircraftToRadarContact(aircraftState, userLat, userLon) {
+  const callsign = (aircraftState[1] || "UNKNOWN").trim();
+  const aircraftLat = aircraftState[6];
+  const aircraftLon = aircraftState[5];
+  const altitude = aircraftState[7];  // barometric altitude in meters
+  const velocity = aircraftState[9];   // velocity in m/s
+
+  const bearing = calculateBearing(userLat, userLon, aircraftLat, aircraftLon);
+  const distance = calculateDistance(userLat, userLon, aircraftLat, aircraftLon);
+
+  // Convert distance to radar radius percentage (0-100)
+  // Assuming max visible distance is 2x the configured radar distance
+  const maxRadiusMiles = appSettings.radarDistance * 2;
+  const radiusPct = Math.min(46, (distance / maxRadiusMiles) * 46);  // cap at 46 to keep in view
+
+  return {
+    angle: bearing,
+    radiusPct: radiusPct,
+    callsign: callsign,
+    altitude: altitude,
+    velocity: velocity,
+    distance: distance,
+    angularVelocity: 0,
+    radialVelocity: 0
+  };
+}
+
+// Load aircraft into radar
+async function loadAircraftContacts(radarState) {
+  try {
+    if (!userLocation) {
+      speakIfEnabled("GPS location required for aircraft radar.");
+      return false;
+    }
+
+    statusLabel.textContent = "FETCHING...";
+    const aircraftStates = await fetchAircraftData();
+
+    if (aircraftStates.length === 0) {
+      primaryReadout.textContent = "No aircraft detected in range.";
+      secondaryReadout.textContent = "Adjust radar distance in settings or relocate.";
+      statusLabel.textContent = "IDLE";
+      return false;
+    }
+
+    const { latitude, longitude } = userLocation;
+    aircraftStates.forEach(state => {
+      try {
+        const contactParams = aircraftToRadarContact(state, latitude, longitude);
+        const contact = createAircraftContact(radarState, contactParams);
+        radarState.contacts.push(contact);
+      } catch (_err) {
+        // Skip problematic aircraft
+      }
+    });
+
+    radarState.currentCount = radarState.contacts.length;
+    radarState.maxCount = radarState.currentCount;
+    primaryReadout.textContent = `Aircraft detected: ${radarState.currentCount} contacts.`;
+    secondaryReadout.textContent = `Radar range: ${appSettings.radarDistance} miles.`;
+    return true;
+  } catch (err) {
+    console.error("Aircraft loading error:", err);
+    primaryReadout.textContent = "Aircraft radar unavailable.";
+    secondaryReadout.textContent = err.message;
+    statusLabel.textContent = "ERROR";
+    return false;
+  }
+}
+
+// Create aircraft contact marker
+function createAircraftContact(radarState, contactParams) {
+  const marker = document.createElement("div");
+  marker.className = "radar-contact aircraft";
+  marker.style.opacity = "1";
+  marker.title = `${contactParams.callsign} @ ${Math.round(contactParams.altitude / 1000)}k ft`;
+
+  const contact = {
+    angle: contactParams.angle,
+    radiusPct: contactParams.radiusPct,
+    displayAngle: contactParams.angle,
+    displayRadiusPct: contactParams.radiusPct,
+    callsign: contactParams.callsign,
+    altitude: contactParams.altitude,
+    velocity: contactParams.velocity,
+    distance: contactParams.distance,
+    angularVelocity: contactParams.angularVelocity,
+    radialVelocity: contactParams.radialVelocity,
+    revealedAt: performance.now(),
+    exiting: false,
+    exitStartedAt: null,
+    exitStartOpacity: 0,
+    marker: marker,
+    isAircraft: true
+  };
+
+  updateRadarMarkerPosition(contact);
+  radarState.radar.appendChild(marker);
+  return contact;
+}
+
 function updateRadarMarkerPosition(contact, useLivePosition = false) {
   const angle = useLivePosition ? contact.angle : contact.displayAngle;
   const radiusPct = useLivePosition ? contact.radiusPct : contact.displayRadiusPct;
@@ -549,7 +743,8 @@ function createLifeformContact(radarState, options = {}) {
     exiting: false,
     exitStartedAt: null,
     exitStartOpacity: 0,
-    marker
+    marker,
+    isAircraft: false
   };
 
   updateRadarMarkerPosition(contact);
@@ -743,11 +938,45 @@ function renderLifeformRadar(options = {}) {
   activeLifeformFrame = requestAnimationFrame(tick);
 }
 
-function runLifeformScan() {
+async function runLifeformScan() {
   renderLifeformRadar({ animateSweep: true });
   lifeformScanActive = true;
-  primaryReadout.textContent = "Sweeping for bio-signs...";
+  primaryReadout.textContent = "Sweeping for aircraft...";
   secondaryReadout.textContent = "Rotational sensor sweep active. Press scan again to stop.";
+
+  // Request GPS location if not already available
+  if (!userLocation) {
+    try {
+      primaryReadout.textContent = "Requesting GPS location...";
+      await getGPSLocation();
+      primaryReadout.textContent = "GPS acquired. Loading aircraft data...";
+    } catch (err) {
+      primaryReadout.textContent = "GPS unavailable. Falling back to simulated scan.";
+      secondaryReadout.textContent = err.message;
+      // Continue with simulated data as fallback
+      if (lifeformRadarState) {
+        seedLifeformContacts(lifeformRadarState);
+      }
+      return;
+    }
+  }
+
+  // Load real aircraft data
+  try {
+    if (lifeformRadarState) {
+      const success = await loadAircraftContacts(lifeformRadarState);
+      if (!success && lifeformRadarState && lifeformRadarState.contacts.length === 0) {
+        // Fallback to simulated contacts if no aircraft found
+        seedLifeformContacts(lifeformRadarState);
+      }
+    }
+  } catch (err) {
+    console.error("Aircraft scan failed:", err);
+    // Fallback to simulated data
+    if (lifeformRadarState) {
+      seedLifeformContacts(lifeformRadarState);
+    }
+  }
 }
 
 function stopLifeformScan() {
@@ -762,13 +991,18 @@ function stopLifeformScan() {
   renderLifeformRadar({ animateSweep: false });
   lifeformScanActive = false;
 
-  primaryReadout.textContent = `Bio-signs detected: ${count} lifeforms within 20 meters.`;
-  secondaryReadout.textContent = "Dominant readings: humanoid, stable vitals, low threat index.";
-  if (peak !== count) {
-    secondaryReadout.textContent += ` Movement observed: fluctuated to ${peak}.`;
+  if (count > 0 && lifeformRadarState && lifeformRadarState.contacts.some(c => c.isAircraft)) {
+    primaryReadout.textContent = `Aircraft detected: ${count} contact(s) within ${appSettings.radarDistance} miles.`;
+    secondaryReadout.textContent = "Radar sweep complete. Aircraft positions relative to current location.";
+    if (peak !== count) {
+      secondaryReadout.textContent += ` Peak contacts: ${peak}.`;
+    }
+  } else {
+    primaryReadout.textContent = `Contacts detected: ${count}.`;
+    secondaryReadout.textContent = "Radar sweep stopped.";
   }
   statusLabel.textContent = "IDLE";
-  speakIfEnabled("Lifeform sweep stopped. Latest bio-sign count available on screen.");
+  speakIfEnabled(`Radar sweep stopped. ${count} contact(s) detected.`);
 }
 
 function renderSettingsPanel() {
@@ -791,12 +1025,22 @@ function renderSettingsPanel() {
         ${appSettings.voice ? "ON" : "OFF"}
       </button>
     </div>
+    <div class="settings-title">RADAR CONTROL</div>
+    <div class="settings-item">
+      <div class="settings-label">RANGE (MILES)</div>
+      <div class="settings-range">
+        <input type="range" id="radar-distance" min="5" max="30" step="1" value="${appSettings.radarDistance}" />
+        <span class="range-value">${appSettings.radarDistance}</span>
+      </div>
+    </div>
   `;
 
   graphArea.appendChild(panel);
 
   const soundToggle = panel.querySelector("#toggle-system-sounds");
   const voiceToggle = panel.querySelector("#toggle-voice");
+  const distanceInput = panel.querySelector("#radar-distance");
+  const rangeValue = panel.querySelector(".range-value");
 
   soundToggle.addEventListener("click", () => {
     appSettings.systemSounds = !appSettings.systemSounds;
@@ -815,6 +1059,14 @@ function renderSettingsPanel() {
     playModeSound("settings", "toggle");
     primaryReadout.textContent = `Voice ${appSettings.voice ? "enabled" : "disabled"}.`;
     renderSettingsPanel();
+  });
+
+  distanceInput.addEventListener("input", () => {
+    const newValue = parseInt(distanceInput.value, 10);
+    appSettings.radarDistance = newValue;
+    saveSettings();
+    rangeValue.textContent = newValue;
+    primaryReadout.textContent = `Radar range set to ${newValue} miles.`;
   });
 }
 
@@ -1092,5 +1344,13 @@ window.tricorder = {
 };
 
 loadSettings();
+
+// Initialize GPS location on app startup
+if (navigator.geolocation) {
+  getGPSLocation().catch(err => {
+    console.warn("GPS initialization failed:", err);
+  });
+}
+
 updateModeUI();
 
