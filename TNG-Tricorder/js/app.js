@@ -785,11 +785,12 @@ async function fetchAircraftData() {
 
   const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
   
-  // Try direct fetch first, then fallback to CORS proxy
+  // Try multiple CORS proxy options in order of reliability
   const corsProxies = [
-    url, // Try direct first
-    `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-    `https://cors-anywhere.herokuapp.com/${url}`
+    url, // Try direct first (works on GitHub Pages)
+    `https://cors.bridged.cc/${url}`,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
   ];
 
   let lastError = null;
@@ -809,11 +810,12 @@ async function fetchAircraftData() {
       
       let data = await response.json();
       
-      // allorigins.win wraps response in a 'contents' field
+      // Handle wrapped responses from some proxies
       if (data.contents && typeof data.contents === 'string') {
         try {
           data = JSON.parse(data.contents);
         } catch (_err) {
+          // Continue to next proxy
           throw new Error("Failed to parse CORS proxy response");
         }
       }
@@ -829,14 +831,14 @@ async function fetchAircraftData() {
       );
     } catch (err) {
       lastError = err;
-      console.warn(`Aircraft fetch attempt failed (${proxyUrl}):`, err.message);
+      console.warn(`Aircraft fetch attempt failed (${proxyUrl.substring(0, 50)}...):`, err.message);
       continue;
     }
   }
   
   // All proxies failed
   console.error("Aircraft fetch error after all attempts:", lastError);
-  throw new Error("Unable to fetch aircraft data. Using simulated scan instead.");
+  throw new Error("Unable to fetch live aircraft data. (For local development, use GitHub Pages or configure a CORS proxy)");
 }
 
 // Convert aircraft state vector to radar contact parameters
