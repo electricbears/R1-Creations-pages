@@ -1,9 +1,9 @@
-const BUILD = "2026-05-24a";
+const BUILD = "2026-05-24b";
 const FEED_PROXY_BASE = "https://api.rss2json.com/v1/api.json?rss_url=";
 const ARTICLE_PROXY_BASE = "https://r.jina.ai/http://";
 const WHEEL_COOLDOWN_MS = 220;
 const ARTICLE_SCROLL_STEP = 28;
-const NAVIGATION_MODES = ["categories", "headlines", "article"];
+const NAVIGATION_MODES = ["categories", "headlines"];
 const CATEGORY_DEFS = [
   { title: "TOP", label: "Top Stories", feedUrl: "https://feeds.bbci.co.uk/news/rss.xml" },
   { title: "WORLD", label: "World", feedUrl: "https://feeds.bbci.co.uk/news/world/rss.xml" },
@@ -21,6 +21,7 @@ const state = {
   headlineIndex: 0,
   headlines: [],
   navigationMode: "categories",
+  articleModalOpen: false,
   lastWheelAt: 0,
   feedRequestId: 0,
   articleRequestId: 0
@@ -33,13 +34,13 @@ const buildLabelEl = document.getElementById("build-label");
 const categoryListEl = document.getElementById("category-list");
 const modeLabelEl = document.getElementById("mode-label");
 const focusLabelEl = document.getElementById("focus-label");
-const primaryReadoutEl = document.getElementById("primary-readout");
-const secondaryReadoutEl = document.getElementById("secondary-readout");
 const headlineListEl = document.getElementById("headline-list");
+const articleModalEl = document.getElementById("article-modal");
 const articleTitleEl = document.getElementById("article-title");
 const articleMetaEl = document.getElementById("article-meta");
 const articleBodyEl = document.getElementById("article-body");
 const articleLinkEl = document.getElementById("article-link");
+const articleCloseEl = document.getElementById("article-close");
 const statusLabelEl = document.getElementById("status-label");
 const timestampLabelEl = document.getElementById("timestamp-label");
 
@@ -66,28 +67,12 @@ function setStatus(label) {
   });
 }
 
-function setReadouts(primary, secondary) {
-  primaryReadoutEl.textContent = primary;
-  secondaryReadoutEl.textContent = secondary;
-}
-
 function updateModeSummary() {
   const category = currentCategory();
   modeLabelEl.textContent = `CATEGORY: ${category.title}`;
-  focusLabelEl.textContent = `FOCUS: ${state.navigationMode.toUpperCase()}`;
-
-  const instructions = {
-    categories: "Wheel: change category. Side: focus headlines.",
-    headlines: "Wheel: move headlines. Side: focus article.",
-    article: "Wheel: scroll article. Side: return to categories."
-  };
-
-  if (!state.headlines.length) {
-    secondaryReadoutEl.textContent = "Loading or no headlines for this category.";
-    return;
-  }
-
-  secondaryReadoutEl.textContent = instructions[state.navigationMode];
+  focusLabelEl.textContent = state.articleModalOpen
+    ? "FOCUS: ARTICLE"
+    : `FOCUS: ${state.navigationMode.toUpperCase()}`;
 }
 
 function formatPubDate(value) {
@@ -209,6 +194,20 @@ function ensureVisible(container, selector) {
   }
 }
 
+function openArticleModal() {
+  state.articleModalOpen = true;
+  articleModalEl.classList.add("show");
+  articleModalEl.setAttribute("aria-hidden", "false");
+  updateModeSummary();
+}
+
+function closeArticleModal() {
+  state.articleModalOpen = false;
+  articleModalEl.classList.remove("show");
+  articleModalEl.setAttribute("aria-hidden", "true");
+  updateModeSummary();
+}
+
 function renderCategories() {
   categoryListEl.innerHTML = "";
 
@@ -226,6 +225,7 @@ function renderCategories() {
     button.addEventListener("click", () => {
       state.categoryIndex = index;
       state.navigationMode = "headlines";
+      closeArticleModal();
       renderCategories();
       updateModeSummary();
       loadFeedForCurrentCategory();
@@ -259,16 +259,18 @@ function renderHeadlineList() {
     }
     button.textContent = item.title;
     button.addEventListener("click", () => {
-      state.headlineIndex = index;
-      state.navigationMode = "article";
-      renderHeadlineList();
-      updateModeSummary();
-      showHeadline(index);
+      openHeadline(index);
     });
     headlineListEl.appendChild(button);
   });
 
   ensureVisible(headlineListEl, ".headline-item.active");
+}
+
+function openHeadline(index) {
+  state.navigationMode = "headlines";
+  showHeadline(index);
+  openArticleModal();
 }
 
 function showHeadline(index) {
@@ -296,11 +298,11 @@ async function loadFeedForCurrentCategory() {
   const requestId = ++state.feedRequestId;
 
   setStatus("SYNC");
-  setReadouts(`Loading ${category.label} feed...`, secondaryReadoutEl.textContent);
   headlineListEl.innerHTML = '<div class="loading-state">Fetching latest BBC headlines...</div>';
   articleTitleEl.textContent = category.label;
   articleMetaEl.textContent = "BBC / Feed sync";
   articleBodyEl.textContent = "Waiting for headlines...";
+  closeArticleModal();
 
   try {
     let items = feedCache.get(category.feedUrl);
@@ -329,7 +331,6 @@ async function loadFeedForCurrentCategory() {
 
     if (!items.length) {
       setStatus("EMPTY");
-      setReadouts(`${category.label} returned no stories.`, "Try another category.");
       articleTitleEl.textContent = "No stories available";
       articleMetaEl.textContent = "BBC / Empty feed";
       articleBodyEl.textContent = "The selected feed returned no stories at the moment.";
@@ -337,7 +338,6 @@ async function loadFeedForCurrentCategory() {
     }
 
     setStatus("READY");
-    setReadouts(`${items.length} headlines loaded for ${category.label}.`, secondaryReadoutEl.textContent);
     showHeadline(0);
   } catch (error) {
     if (requestId !== state.feedRequestId) {
@@ -348,7 +348,6 @@ async function loadFeedForCurrentCategory() {
     state.headlineIndex = 0;
     renderHeadlineList();
     setStatus("ERROR");
-    setReadouts(`Unable to load ${category.label}.`, "Feed proxy unavailable. Select another category or retry.");
     articleTitleEl.textContent = "Feed error";
     articleMetaEl.textContent = "BBC / Unavailable";
     articleBodyEl.textContent = error.message;
@@ -397,6 +396,18 @@ async function loadArticleForHeadline(item) {
 }
 
 function cycleNavigationMode() {
+  if (state.articleModalOpen) {
+    closeArticleModal();
+    setStatus("LIST");
+    return;
+  }
+
+  if (state.navigationMode === "headlines" && state.headlines.length) {
+    openHeadline(state.headlineIndex);
+    setStatus("ARTICLE");
+    return;
+  }
+
   const currentIndex = NAVIGATION_MODES.indexOf(state.navigationMode);
   state.navigationMode = NAVIGATION_MODES[(currentIndex + 1) % NAVIGATION_MODES.length];
   renderCategories();
@@ -411,6 +422,11 @@ function handleWheel(delta) {
     return;
   }
   state.lastWheelAt = now;
+
+  if (state.articleModalOpen) {
+    articleBodyEl.scrollTop += delta * ARTICLE_SCROLL_STEP;
+    return;
+  }
 
   if (state.navigationMode === "categories") {
     state.categoryIndex = wrapIndex(state.categoryIndex + delta, CATEGORY_DEFS.length);
@@ -427,11 +443,8 @@ function handleWheel(delta) {
     state.headlineIndex = wrapIndex(state.headlineIndex + delta, state.headlines.length);
     renderHeadlineList();
     updateModeSummary();
-    showHeadline(state.headlineIndex);
     return;
   }
-
-  articleBodyEl.scrollTop += delta * ARTICLE_SCROLL_STEP;
 }
 
 function emitHardwareEvent(name) {
@@ -522,6 +535,16 @@ function bindEvents() {
   window.addEventListener("scrollUp", () => handleWheel(-1));
   window.addEventListener("scrollDown", () => handleWheel(1));
   window.addEventListener("sideClick", cycleNavigationMode);
+  articleCloseEl.addEventListener("click", () => {
+    closeArticleModal();
+    setStatus("LIST");
+  });
+  articleModalEl.addEventListener("click", event => {
+    if (event.target === articleModalEl) {
+      closeArticleModal();
+      setStatus("LIST");
+    }
+  });
 }
 
 function init() {

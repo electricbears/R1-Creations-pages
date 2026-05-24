@@ -22,24 +22,26 @@
           <div class="lcars-focus" id="focus-label">FOCUS: CATEGORIES</div>
         </div>
 
-        <div class="lcars-readout" id="primary-readout">Synchronizing BBC feed...</div>
-        <div class="lcars-readout small" id="secondary-readout">Wheel navigates. Side button changes focus.</div>
+        <section class="news-panel headline-panel" aria-labelledby="headline-panel-title">
+          <div class="panel-header" id="headline-panel-title">HEADLINES</div>
+          <div id="headline-list" class="scroll-panel headline-list" aria-live="polite"></div>
+        </section>
+      </div>
+    </div>
 
-        <div class="news-panels">
-          <section class="news-panel headline-panel" aria-labelledby="headline-panel-title">
-            <div class="panel-header" id="headline-panel-title">HEADLINES</div>
-            <div id="headline-list" class="scroll-panel headline-list" aria-live="polite"></div>
-          </section>
-
-          <section class="news-panel article-panel" aria-labelledby="article-title">
-            <div class="article-topline">
-              <div id="article-title" class="article-title">Select a headline</div>
-              <a id="article-link" class="article-link" href="https://www.bbc.com/news" target="_blank" rel="noreferrer">OPEN</a>
-            </div>
+    <div id="article-modal" class="article-modal" aria-hidden="true">
+      <div class="article-modal-card" role="dialog" aria-modal="true" aria-labelledby="article-title">
+        <div class="article-modal-header">
+          <div class="article-header-copy">
+            <div id="article-title" class="article-title">Select a headline</div>
             <div id="article-meta" class="article-meta">BBC / Awaiting selection</div>
-            <div id="article-body" class="scroll-panel article-body">Choose a category, then a headline, to read the article text here.</div>
-          </section>
+          </div>
+          <div class="article-actions">
+            <a id="article-link" class="article-link" href="https://www.bbc.com/news" target="_blank" rel="noreferrer">OPEN</a>
+            <button id="article-close" class="article-close" type="button">CLOSE</button>
+          </div>
         </div>
+        <div id="article-body" class="scroll-panel article-body">Choose a category, then a headline, to read the article text here.</div>
       </div>
     </div>
 
