@@ -784,25 +784,59 @@ async function fetchAircraftData() {
   const lomax = longitude + radiusDeg;
 
   const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
+  
+  // Try direct fetch first, then fallback to CORS proxy
+  const corsProxies = [
+    url, // Try direct first
+    `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+    `https://cors-anywhere.herokuapp.com/${url}`
+  ];
 
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`OpenSky API error: ${response.status}`);
+  let lastError = null;
+  for (const proxyUrl of corsProxies) {
+    try {
+      const response = await fetch(proxyUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        },
+        mode: 'cors'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+      
+      let data = await response.json();
+      
+      // allorigins.win wraps response in a 'contents' field
+      if (data.contents && typeof data.contents === 'string') {
+        try {
+          data = JSON.parse(data.contents);
+        } catch (_err) {
+          throw new Error("Failed to parse CORS proxy response");
+        }
+      }
+      
+      if (!data.states || !Array.isArray(data.states)) {
+        return [];
+      }
+      
+      // Filter valid aircraft with position data
+      return data.states.filter(state =>
+        state[5] !== null && state[6] !== null &&  // longitude and latitude
+        state[1] !== null  // callsign
+      );
+    } catch (err) {
+      lastError = err;
+      console.warn(`Aircraft fetch attempt failed (${proxyUrl}):`, err.message);
+      continue;
     }
-    const data = await response.json();
-    if (!data.states || !Array.isArray(data.states)) {
-      return [];
-    }
-    // Filter valid aircraft with position data
-    return data.states.filter(state =>
-      state[5] !== null && state[6] !== null &&  // longitude and latitude
-      state[1] !== null  // callsign
-    );
-  } catch (err) {
-    console.error("Aircraft fetch error:", err);
-    throw err;
   }
+  
+  // All proxies failed
+  console.error("Aircraft fetch error after all attempts:", lastError);
+  throw new Error("Unable to fetch aircraft data. Using simulated scan instead.");
 }
 
 // Convert aircraft state vector to radar contact parameters
@@ -1201,6 +1235,7 @@ async function runLifeformScan(container = graphArea, options = {}) {
       const success = await loadAircraftContacts(lifeformRadarState);
       if (!success && lifeformRadarState && lifeformRadarState.contacts.length === 0) {
         // Fallback to simulated contacts if no aircraft found
+        primaryReadout.textContent = "Aircraft data unavailable. Running simulated scan...";
         seedLifeformContacts(lifeformRadarState);
       }
     }
@@ -1208,6 +1243,8 @@ async function runLifeformScan(container = graphArea, options = {}) {
     console.error("Aircraft scan failed:", err);
     // Fallback to simulated data
     if (lifeformRadarState) {
+      primaryReadout.textContent = "Using simulated scan.";
+      secondaryReadout.textContent = "Live aircraft data temporarily unavailable.";
       seedLifeformContacts(lifeformRadarState);
     }
   }
