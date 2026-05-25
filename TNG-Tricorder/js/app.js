@@ -25,8 +25,9 @@ let medicalAmbience = null;
 const appSettings = {
   systemSounds: true,
   voice: true,
-  radarDistance: 12
-};  // radarDistance in miles
+  radarDistance: 12,
+  simulatedMode: false
+};  // radarDistance in miles, simulatedMode for blips vs aircraft
 
 let userLocation = null;  // { latitude, longitude, accuracy }
 let aircraftCache = [];   // cached aircraft data with timestamp
@@ -172,6 +173,9 @@ function loadSettings() {
     }
     if (typeof parsed.radarDistance === "number") {
       appSettings.radarDistance = parsed.radarDistance;
+    }
+    if (typeof parsed.simulatedMode === "boolean") {
+      appSettings.simulatedMode = parsed.simulatedMode;
     }
   } catch (_err) {
     // Fall back to defaults if storage is unavailable or invalid.
@@ -1262,6 +1266,18 @@ async function runLifeformScan(container = graphArea, options = {}) {
   const modal = options.modal === true;
   renderLifeformRadar({ animateSweep: true, container, large: modal });
   lifeformScanActive = true;
+
+  // If simulated mode is on, just show simulated blips
+  if (appSettings.simulatedMode) {
+    primaryReadout.textContent = "Sweeping for lifeforms...";
+    secondaryReadout.textContent = "Simulated mode active.";
+    if (lifeformRadarState) {
+      seedLifeformContacts(lifeformRadarState);
+    }
+    return;
+  }
+
+  // Real aircraft mode: request GPS and fetch aircraft data
   primaryReadout.textContent = "Sweeping for aircraft...";
   secondaryReadout.textContent = "Rotational sensor sweep active. Press scan again to stop.";
 
@@ -1277,39 +1293,21 @@ async function runLifeformScan(container = graphArea, options = {}) {
         primaryReadout.textContent = "Using home location...";
         userLocation = HOME_LOCATION;
       } else {
-        primaryReadout.textContent = "GPS unavailable. Falling back to simulated scan.";
+        primaryReadout.textContent = "GPS unavailable. No aircraft data.";
         secondaryReadout.textContent = err.message;
-        // Continue with simulated data as fallback
-        if (lifeformRadarState) {
-          seedLifeformContacts(lifeformRadarState);
-        }
         return;
       }
     }
   }
 
   // Load real aircraft data
-  try {
-    if (lifeformRadarState) {
-      const success = await loadAircraftContacts(lifeformRadarState);
-      if (!success) {
-        // Fallback to simulated contacts only if aircraft load completely failed
-        primaryReadout.textContent = "Aircraft data unavailable. Running simulated scan...";
-        secondaryReadout.textContent = "No aircraft detected or network error.";
-        if (lifeformRadarState && lifeformRadarState.contacts.length === 0) {
-          seedLifeformContacts(lifeformRadarState);
-        }
-      }
-    }
-  } catch (err) {
-    console.error("Aircraft scan failed:", err);
-    // Fallback to simulated data only if no aircraft loaded
-    if (lifeformRadarState) {
-      primaryReadout.textContent = "Using simulated scan.";
-      secondaryReadout.textContent = "Live aircraft data temporarily unavailable.";
-      if (lifeformRadarState.contacts.length === 0) {
-        seedLifeformContacts(lifeformRadarState);
-      }
+  if (lifeformRadarState) {
+    try {
+      await loadAircraftContacts(lifeformRadarState);
+    } catch (err) {
+      console.error("Aircraft scan failed:", err);
+      primaryReadout.textContent = "Aircraft data unavailable.";
+      secondaryReadout.textContent = err.message;
     }
   }
 }
@@ -1372,6 +1370,12 @@ function renderSettingsPanel() {
         <span class="range-value">${appSettings.radarDistance}</span>
       </div>
     </div>
+    <div class="settings-item">
+      <div class="settings-label">SIMULATED MODE</div>
+      <button class="settings-toggle ${appSettings.simulatedMode ? "on" : "off"}" type="button" id="toggle-simulated-mode">
+        ${appSettings.simulatedMode ? "ON" : "OFF"}
+      </button>
+    </div>
   `;
 
   graphArea.appendChild(panel);
@@ -1380,6 +1384,7 @@ function renderSettingsPanel() {
   const voiceToggle = panel.querySelector("#toggle-voice");
   const distanceInput = panel.querySelector("#radar-distance");
   const rangeValue = panel.querySelector(".range-value");
+  const simulatedToggle = panel.querySelector("#toggle-simulated-mode");
 
   soundToggle.addEventListener("click", () => {
     appSettings.systemSounds = !appSettings.systemSounds;
@@ -1406,6 +1411,14 @@ function renderSettingsPanel() {
     saveSettings();
     rangeValue.textContent = newValue;
     primaryReadout.textContent = `Radar range set to ${newValue} miles.`;
+  });
+
+  simulatedToggle.addEventListener("click", () => {
+    appSettings.simulatedMode = !appSettings.simulatedMode;
+    saveSettings();
+    playModeSound("settings", "toggle");
+    primaryReadout.textContent = `Simulated mode ${appSettings.simulatedMode ? "enabled" : "disabled"}.`;
+    renderSettingsPanel();
   });
 }
 
