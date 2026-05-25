@@ -895,11 +895,27 @@ function aircraftToRadarContact(aircraftState, userLat, userLon) {
 }
 
 // Load aircraft into radar
-async function loadAircraftContacts(radarState) {
+async function loadAircraftContacts(radarState, isRefresh = false) {
   try {
     if (!userLocation) {
       speakIfEnabled("GPS location required for aircraft radar.");
       return false;
+    }
+
+    // Clear old aircraft contacts and their markers before loading new ones
+    if (isRefresh) {
+      const oldAircraft = radarState.contacts.filter(contact => contact.isAircraft);
+      // Remove old aircraft markers from DOM
+      oldAircraft.forEach(aircraft => {
+        if (aircraft.marker && aircraft.marker.parentNode) {
+          aircraft.marker.parentNode.removeChild(aircraft.marker);
+        }
+        if (aircraft.label && aircraft.label.parentNode) {
+          aircraft.label.parentNode.removeChild(aircraft.label);
+        }
+      });
+      // Remove aircraft from contacts array
+      radarState.contacts = radarState.contacts.filter(contact => !contact.isAircraft);
     }
 
     statusLabel.textContent = "FETCHING...";
@@ -940,12 +956,12 @@ async function loadAircraftContacts(radarState) {
 // Create aircraft contact marker
 function createAircraftContact(radarState, contactParams) {
   const marker = document.createElement("div");
-  marker.className = "radar-contact aircraft";
+  marker.className = "radar-contact";
   marker.style.opacity = "0";
   marker.title = `${contactParams.callsign} @ ${Math.round(contactParams.altitude / 1000)}k ft`;
 
   const label = document.createElement("div");
-  label.className = "radar-contact-label aircraft-label";
+  label.className = "radar-contact-label";
   label.textContent = contactParams.callsign;
   label.style.opacity = "0";
 
@@ -1144,7 +1160,9 @@ function renderLifeformRadar(options = {}) {
     contacts: [],
     currentCount: 0,
     maxCount: 0,
-    sweeps: 0
+    sweeps: 0,
+    sweepCount: 0,
+    lastSweepRefreshAngle: 0
   };
 
   seedLifeformContacts(lifeformRadarState);
@@ -1169,6 +1187,17 @@ function renderLifeformRadar(options = {}) {
     lifeformRadarState.lastTick = now;
     lifeformRadarState.lastAngle = lifeformRadarState.angle;
     lifeformRadarState.angle = (lifeformRadarState.angle + elapsed * LIFEFORM_SWEEP_SPEED_DEG_PER_MS) % 360;
+
+    // Detect sweep completion (angle wraps from ~360 back to ~0) and refresh aircraft every 10 sweeps
+    if (lifeformRadarState.lastAngle > 270 && lifeformRadarState.angle < 90) {
+      lifeformRadarState.sweepCount++;
+      if (lifeformRadarState.sweepCount % 10 === 0 && userLocation) {
+        // Refresh aircraft data every 10 sweeps
+        loadAircraftContacts(lifeformRadarState, true).catch(err => {
+          console.warn("Periodic aircraft refresh failed:", err.message);
+        });
+      }
+    }
 
     lifeformRadarState.sweepHand.style.transform = `translateY(-50%) rotate(${lifeformRadarState.angle}deg)`;
 
