@@ -597,6 +597,7 @@ const LIFEFORM_EXIT_FADE_MS_PER_STEP = 900;
 const LIFEFORM_SWEEP_SPEED_DEG_PER_MS = 0.1;
 const LIFEFORM_MOVEMENT_BOOST = 2.8;
 const LIFEFORM_PING_COOLDOWN_MS = 70;
+const LIFEFORM_AIRCRAFT_REFRESH_SWEEPS = 3;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -1195,11 +1196,11 @@ function renderLifeformRadar(options = {}) {
     lifeformRadarState.lastAngle = lifeformRadarState.angle;
     lifeformRadarState.angle = (lifeformRadarState.angle + elapsed * LIFEFORM_SWEEP_SPEED_DEG_PER_MS) % 360;
 
-    // Detect sweep completion (angle wraps from ~360 back to ~0) and refresh aircraft every 10 sweeps
+    // Detect sweep completion (angle wraps from ~360 back to ~0) and refresh aircraft periodically.
     if (lifeformRadarState.lastAngle > 270 && lifeformRadarState.angle < 90) {
       lifeformRadarState.sweepCount++;
-      if (lifeformRadarState.sweepCount % 10 === 0 && userLocation) {
-        // Refresh aircraft data every 10 sweeps
+      if (lifeformRadarState.sweepCount % LIFEFORM_AIRCRAFT_REFRESH_SWEEPS === 0 && userLocation) {
+        // Refresh aircraft data every configured sweep interval.
         loadAircraftContacts(lifeformRadarState, true).catch(err => {
           console.warn("Periodic aircraft refresh failed:", err.message);
         });
@@ -1333,7 +1334,7 @@ function stopLifeformScan() {
   if (hasAircraft) {
     const aircraftCount = currentRadarState.contacts.filter(c => c.isAircraft && !c.exiting).length;
     primaryReadout.textContent = `Real aircraft: ${aircraftCount} contact(s) within ${appSettings.radarDistance} miles.`;
-    secondaryReadout.textContent = "Radar sweep complete. Aircraft refresh every 10 sweeps.";
+    secondaryReadout.textContent = `Radar sweep complete. Aircraft refresh every ${LIFEFORM_AIRCRAFT_REFRESH_SWEEPS} sweeps.`;
   } else {
     primaryReadout.textContent = count > 0 ? `Simulated contacts: ${count}.` : "No contacts detected.";
     secondaryReadout.textContent = "Radar sweep stopped.";
