@@ -1,11 +1,10 @@
 const MODES = ["lifeform", "atmosphere", "diagnostics", "medical", "settings"];
 let currentModeIndex = 0;
 const SETTINGS_STORAGE_KEY = "tricorder-settings-v1";
-const OPENSKY_PROXY_STORAGE_KEY = "tricorder-opensky-proxy-base-url";
 
 // Home location fallback for when GPS is unavailable
 const HOME_LOCATION = { latitude: 53.117252, longitude: -2.939227 };
-const OPENSKY_PROXY_BASE_URL = (window.OPENSKY_PROXY_BASE_URL || "").trim();
+const AIRCRAFT_ICON_URL = "assets/aircraft-contact-icon.png";
 
 const modeLabel = document.getElementById("mode-label");
 const primaryReadout = document.getElementById("primary-readout");
@@ -34,6 +33,7 @@ let aircraftCache = [];   // cached aircraft data with timestamp
 let radarModalOverlay = null;
 let radarModalStage = null;
 let radarModalOpen = false;
+let aircraftInfoModalOpen = false;
 let pendingLocationRequest = null;
 
 function normalizeLocationPayload(payload) {
@@ -603,6 +603,19 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function normalizeHeadingDegrees(heading) {
+  const normalized = Number(heading);
+  if (!Number.isFinite(normalized)) {
+    return 0;
+  }
+  return ((normalized % 360) + 360) % 360;
+}
+
+function applyAircraftIcon(marker) {
+  marker.classList.add("aircraft", "aircraft-icon");
+  marker.style.backgroundImage = `url("${AIRCRAFT_ICON_URL}")`;
+}
+
 // GPS and Aircraft Radar Functions
 function requestRabbitLocation() {
   return new Promise((resolve, reject) => {
@@ -715,6 +728,80 @@ function setContactOpacity(contact, opacity) {
   }
 }
 
+function closeAircraftInfoModal() {
+  aircraftInfoModalOpen = false;
+  const modal = document.querySelector(".aircraft-info-modal");
+  if (modal && modal.parentNode) {
+    modal.parentNode.removeChild(modal);
+  }
+}
+
+function openAircraftInfoModal(contact) {
+  if (aircraftInfoModalOpen) {
+    closeAircraftInfoModal();
+  }
+
+  aircraftInfoModalOpen = true;
+
+  const modal = document.createElement("div");
+  modal.className = "aircraft-info-modal";
+
+  const altFt = Math.round((contact.altitude || 0) / 0.3048);
+  const velKts = Math.round((contact.velocity || 0) * 1.94384);
+
+  modal.innerHTML = `
+    <div class="aircraft-info-card">
+      <div class="aircraft-info-header">
+        <div class="aircraft-info-title">${contact.callsign}</div>
+        <div class="aircraft-info-close">✕</div>
+      </div>
+      <div class="aircraft-info-body">
+        <div class="aircraft-info-row">
+          <span class="aircraft-info-label">ICAO24:</span>
+          <span class="aircraft-info-value">${contact.icao24 || "—"}</span>
+        </div>
+        <div class="aircraft-info-row">
+          <span class="aircraft-info-label">Altitude:</span>
+          <span class="aircraft-info-value">${altFt.toLocaleString()} ft</span>
+        </div>
+        <div class="aircraft-info-row">
+          <span class="aircraft-info-label">Velocity:</span>
+          <span class="aircraft-info-value">${velKts} kt</span>
+        </div>
+        <div class="aircraft-info-row">
+          <span class="aircraft-info-label">Heading:</span>
+          <span class="aircraft-info-value">${Math.round(contact.heading)}°</span>
+        </div>
+        <div class="aircraft-info-row">
+          <span class="aircraft-info-label">Distance:</span>
+          <span class="aircraft-info-value">${contact.distance.toFixed(1)} mi</span>
+        </div>
+        <div class="aircraft-info-row">
+          <span class="aircraft-info-label">Position:</span>
+          <span class="aircraft-info-value">${contact.latitude.toFixed(4)}, ${contact.longitude.toFixed(4)}</span>
+        </div>
+        <div class="aircraft-info-row">
+          <span class="aircraft-info-label">Origin:</span>
+          <span class="aircraft-info-value">—</span>
+        </div>
+        <div class="aircraft-info-row">
+          <span class="aircraft-info-label">Destination:</span>
+          <span class="aircraft-info-value">—</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const closeBtn = modal.querySelector(".aircraft-info-close");
+  closeBtn.addEventListener("click", closeAircraftInfoModal);
+  modal.addEventListener("click", closeAircraftInfoModal);
+  modal.querySelector(".aircraft-info-card").addEventListener("click", event => {
+    event.stopPropagation();
+  });
+}
+
 function closeRadarModal() {
   if (!radarModalOpen) {
     return;
@@ -791,21 +878,10 @@ async function fetchAircraftData() {
   const lomax = longitude + radiusDeg;
 
   const openskyUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
-  const requestPath = `/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
-  const configuredProxyBase = (
-    localStorage.getItem(OPENSKY_PROXY_STORAGE_KEY) || OPENSKY_PROXY_BASE_URL
-  ).trim().replace(/\/$/, "");
-
-  const requestCandidates = [];
-  // Primary: User's custom PHP CORS proxy
-  requestCandidates.push(`https://www.electricbears.com/cors-proxy.php?url=${encodeURIComponent(openskyUrl)}`);
-  // Secondary: User-configured proxy if set
-  if (configuredProxyBase) {
-    requestCandidates.push(`${configuredProxyBase}${requestPath}`);
-  }
-  // Fallback: AllOrigins public proxy endpoints
-  requestCandidates.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(openskyUrl)}`);
-  requestCandidates.push(`https://api.allorigins.win/get?url=${encodeURIComponent(openskyUrl)}`);
+  const requestCandidates = [
+    // ElectricBears is the only allowed proxy source for aircraft data.
+    `https://www.electricbears.com/cors-proxy.php?url=${encodeURIComponent(openskyUrl)}&cb=${Date.now()}`
+  ];
 
   let lastError = null;
   for (const requestUrl of requestCandidates) {
@@ -815,7 +891,8 @@ async function fetchAircraftData() {
         headers: {
           'Accept': 'application/json'
         },
-        mode: 'cors'
+        mode: 'cors',
+        cache: 'no-store'
       });
 
       if (!response.ok) {
@@ -873,11 +950,14 @@ async function fetchAircraftData() {
 
 // Convert aircraft state vector to radar contact parameters
 function aircraftToRadarContact(aircraftState, userLat, userLon) {
+  const icao24 = aircraftState[0];  // ICAO24 aircraft code
   const callsign = (aircraftState[1] || "UNKNOWN").trim();
   const aircraftLat = aircraftState[6];
   const aircraftLon = aircraftState[5];
   const altitude = aircraftState[7];  // barometric altitude in meters
   const velocity = aircraftState[9];   // velocity in m/s
+  const trueTrack = aircraftState[10];
+  const category = aircraftState[17];
 
   const bearing = calculateBearing(userLat, userLon, aircraftLat, aircraftLon);
   const distance = calculateDistance(userLat, userLon, aircraftLat, aircraftLon);
@@ -891,9 +971,14 @@ function aircraftToRadarContact(aircraftState, userLat, userLon) {
     angle: bearing,
     radiusPct: radiusPct,
     callsign: callsign,
+    icao24: icao24,
     altitude: altitude,
     velocity: velocity,
+    heading: Number.isFinite(trueTrack) ? trueTrack : bearing,
+    category: Number.isFinite(category) ? category : 0,
     distance: distance,
+    latitude: aircraftLat,
+    longitude: aircraftLon,
     angularVelocity: 0,
     radialVelocity: 0
   };
@@ -962,7 +1047,9 @@ async function loadAircraftContacts(radarState, isRefresh = false) {
 function createAircraftContact(radarState, contactParams) {
   const marker = document.createElement("div");
   marker.className = "radar-contact";
+  applyAircraftIcon(marker);
   marker.style.opacity = "0";
+  marker.style.cursor = "pointer";
   marker.title = `${contactParams.callsign} @ ${Math.round(contactParams.altitude / 1000)}k ft`;
 
   const label = document.createElement("div");
@@ -976,9 +1063,14 @@ function createAircraftContact(radarState, contactParams) {
     displayAngle: contactParams.angle,
     displayRadiusPct: contactParams.radiusPct,
     callsign: contactParams.callsign,
+    icao24: contactParams.icao24,
     altitude: contactParams.altitude,
     velocity: contactParams.velocity,
+    heading: contactParams.heading,
+    category: contactParams.category,
     distance: contactParams.distance,
+    latitude: contactParams.latitude,
+    longitude: contactParams.longitude,
     angularVelocity: contactParams.angularVelocity,
     radialVelocity: contactParams.radialVelocity,
     revealedAt: performance.now(),
@@ -989,6 +1081,11 @@ function createAircraftContact(radarState, contactParams) {
     label,
     isAircraft: true
   };
+
+  marker.addEventListener("click", event => {
+    event.stopPropagation();
+    openAircraftInfoModal(contact);
+  });
 
   updateRadarMarkerPosition(contact);
   radarState.radar.appendChild(marker);
@@ -1004,6 +1101,12 @@ function updateRadarMarkerPosition(contact, useLivePosition = false) {
   const y = 50 + Math.sin(radians) * radiusPct;
   contact.marker.style.left = `${x}%`;
   contact.marker.style.top = `${y}%`;
+  if (contact.isAircraft) {
+    const heading = normalizeHeadingDegrees(contact.heading);
+    contact.marker.style.transform = `translate(-50%, -50%) rotate(${heading}deg)`;
+  } else {
+    contact.marker.style.transform = "translate(-50%, -50%)";
+  }
   if (contact.label) {
     contact.label.style.left = `${x}%`;
     contact.label.style.top = `${y}%`;
@@ -1162,6 +1265,7 @@ function renderLifeformRadar(options = {}) {
   lifeformRadarState = {
     radar,
     sweepHand,
+    simulatedMode: appSettings.simulatedMode,
     angle: 0,
     lastAngle: 0,
     lastTick: performance.now(),
@@ -1209,7 +1313,9 @@ function renderLifeformRadar(options = {}) {
 
     lifeformRadarState.sweepHand.style.transform = `translateY(-50%) rotate(${lifeformRadarState.angle}deg)`;
 
-    stepLifeformContacts(lifeformRadarState, elapsed, now);
+    if (lifeformRadarState.simulatedMode) {
+      stepLifeformContacts(lifeformRadarState, elapsed, now);
+    }
 
     lifeformRadarState.contacts.forEach(contact => {
       if (contact.exiting && contact.exitStartedAt !== null) {

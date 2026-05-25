@@ -568,11 +568,113 @@ body.radar-modal-open .radar-contact-label {
 
 /* Aircraft radar styling */
 .radar-contact.aircraft {
-  background: #66ccff;
-  box-shadow: 0 0 6px rgba(102, 204, 255, 0.9), inset 0 0 3px rgba(102, 204, 255, 0.6);
-  border: 1px solid rgba(102, 204, 255, 0.7);
+  background: #ffcc66;
+  box-shadow: 0 0 8px rgba(255, 204, 102, 0.95);
+  border: 1px solid rgba(255, 204, 102, 0.7);
   width: 6px;
   height: 6px;
+}
+
+.radar-contact.aircraft-icon {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  filter: drop-shadow(0 0 6px rgba(255, 204, 102, 0.9));
+  background: transparent;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+}
+
+/* Aircraft info modal */
+.aircraft-info-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  box-sizing: border-box;
+  backdrop-filter: blur(2px);
+}
+
+.aircraft-info-card {
+  background: linear-gradient(180deg, rgba(8, 10, 16, 0.98), rgba(2, 4, 8, 0.98));
+  border: 1px solid rgba(102, 204, 255, 0.42);
+  border-radius: 12px;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.6), 0 0 16px rgba(102, 204, 255, 0.2);
+  max-width: 320px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.aircraft-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(90deg, #ff9966, #ffcc66);
+  color: #110e0a;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.aircraft-info-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  flex: 1;
+}
+
+.aircraft-info-close {
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 150ms ease-out;
+}
+
+.aircraft-info-close:hover {
+  opacity: 1;
+}
+
+.aircraft-info-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 50vh;
+  overflow-y: auto;
+  font-size: 11px;
+}
+
+.aircraft-info-row {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(102, 204, 255, 0.08);
+}
+
+.aircraft-info-row:last-child {
+  border-bottom: none;
+}
+
+.aircraft-info-label {
+  color: #ffcc66;
+  font-weight: 600;
+  text-align: right;
+}
+
+.aircraft-info-value {
+  color: #d8e7f3;
+  font-family: monospace;
+  word-break: break-word;
 }
 
 /* Radar distance range slider */
