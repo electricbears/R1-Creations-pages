@@ -1,9 +1,11 @@
 const MODES = ["lifeform", "atmosphere", "diagnostics", "medical", "settings"];
 let currentModeIndex = 0;
 const SETTINGS_STORAGE_KEY = "tricorder-settings-v1";
+const OPENSKY_PROXY_STORAGE_KEY = "tricorder-opensky-proxy-base-url";
 
 // Home location fallback for when GPS is unavailable
 const HOME_LOCATION = { latitude: 53.117252, longitude: -2.939227 };
+const OPENSKY_PROXY_BASE_URL = (window.OPENSKY_PROXY_BASE_URL || "").trim();
 
 const modeLabel = document.getElementById("mode-label");
 const primaryReadout = document.getElementById("primary-readout");
@@ -783,58 +785,72 @@ async function fetchAircraftData() {
   const lomin = longitude - radiusDeg;
   const lomax = longitude + radiusDeg;
 
-  const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
-  
-  // Determine if running on localhost (skip direct fetch due to CORS)
-  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  
-  // Try multiple CORS proxy options in order of reliability
-  const corsProxies = isLocalhost 
-    ? [
-        // Skip direct fetch on localhost; go straight to proxies
-        `https://cors.bridged.cc/${url}`,
-        `https://corsproxy.io/?${encodeURIComponent(url)}`,
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
-      ]
-    : [
-        // On GitHub Pages, try direct first
-        url,
-        `https://cors.bridged.cc/${url}`,
-        `https://corsproxy.io/?${encodeURIComponent(url)}`,
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
-      ];
+  const openskyUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
+  const requestPath = `/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
+  const configuredProxyBase = (
+    localStorage.getItem(OPENSKY_PROXY_STORAGE_KEY) || OPENSKY_PROXY_BASE_URL
+  ).trim().replace(/\/$/, "");
+
+  const requestCandidates = [];
+  // Primary: User's custom PHP CORS proxy
+  requestCandidates.push(`https://www.electricbears.com/cors-proxy.php?url=${encodeURIComponent(openskyUrl)}`);
+  // Secondary: User-configured proxy if set
+  if (configuredProxyBase) {
+    requestCandidates.push(`${configuredProxyBase}${requestPath}`);
+  }
+  // Fallback: AllOrigins public proxy endpoints
+  requestCandidates.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(openskyUrl)}`);
+  requestCandidates.push(`https://api.allorigins.win/get?url=${encodeURIComponent(openskyUrl)}`);
 
   let lastError = null;
-  for (const proxyUrl of corsProxies) {
+  for (const requestUrl of requestCandidates) {
     try {
-      const response = await fetch(proxyUrl, {
+      const response = await fetch(requestUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
         },
         mode: 'cors'
       });
-      
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status} ${response.statusText}`);
       }
-      
-      let data = await response.json();
-      
-      // Handle wrapped responses from some proxies
-      if (data.contents && typeof data.contents === 'string') {
+
+      const responseText = await response.text();
+      const normalizedText = responseText.trim();
+
+      if (!normalizedText) {
+        throw new Error("Empty response body from proxy");
+      }
+
+      if (/too many requests/i.test(normalizedText)) {
+        throw new Error("Proxy rate limited this request (Too many requests)");
+      }
+
+      let data;
+      try {
+        data = JSON.parse(normalizedText);
+      } catch (_parseErr) {
+        throw new Error(`Proxy returned non-JSON response: ${normalizedText.slice(0, 120)}`);
+      }
+
+      if (data && typeof data.contents === 'string') {
+        const wrappedText = data.contents.trim();
+        if (/too many requests/i.test(wrappedText)) {
+          throw new Error("Proxy rate limited wrapped response (Too many requests)");
+        }
         try {
-          data = JSON.parse(data.contents);
-        } catch (_err) {
-          // Continue to next proxy
-          throw new Error("Failed to parse CORS proxy response");
+          data = JSON.parse(wrappedText);
+        } catch (_parseErr) {
+          throw new Error(`Proxy returned non-JSON wrapped response: ${wrappedText.slice(0, 120)}`);
         }
       }
-      
+
       if (!data.states || !Array.isArray(data.states)) {
         return [];
       }
-      
+
       // Filter valid aircraft with position data
       return data.states.filter(state =>
         state[5] !== null && state[6] !== null &&  // longitude and latitude
@@ -842,14 +858,12 @@ async function fetchAircraftData() {
       );
     } catch (err) {
       lastError = err;
-      console.warn(`Aircraft fetch attempt failed (${proxyUrl.substring(0, 50)}...):`, err.message);
-      continue;
+      console.warn(`Aircraft fetch attempt failed (${requestUrl.substring(0, 60)}...):`, err.message);
     }
   }
-  
-  // All proxies failed
-  console.error("Aircraft fetch error after all attempts:", lastError);
-  throw new Error("Unable to fetch live aircraft data. (Local testing: use GitHub Pages or install a CORS browser extension)");
+
+  console.error("Aircraft fetch error:", lastError);
+  throw new Error("Unable to fetch live aircraft data. Configure your own proxy or try again later.");
 }
 
 // Convert aircraft state vector to radar contact parameters
