@@ -1326,6 +1326,7 @@ function stopLifeformScan() {
 
   const currentRadarState = lifeformRadarState;
   const hasAircraft = currentRadarState && currentRadarState.contacts.some(c => c.isAircraft);
+  const count = currentRadarState ? currentRadarState.currentCount : randomInt(1, 7);
   
   stopLifeformRadar();
   renderLifeformRadar({ animateSweep: false, container: graphArea });
@@ -1336,7 +1337,6 @@ function stopLifeformScan() {
     primaryReadout.textContent = `Real aircraft: ${aircraftCount} contact(s) within ${appSettings.radarDistance} miles.`;
     secondaryReadout.textContent = "Radar sweep complete. Aircraft refresh every 10 sweeps.";
   } else {
-    const count = currentRadarState ? currentRadarState.currentCount : randomInt(1, 7);
     primaryReadout.textContent = count > 0 ? `Simulated contacts: ${count}.` : "No contacts detected.";
     secondaryReadout.textContent = "Radar sweep stopped.";
   }
