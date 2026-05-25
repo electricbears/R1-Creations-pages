@@ -1054,6 +1054,11 @@ function stepLifeformContacts(radarState, elapsed, now) {
       return true;
     }
 
+    // Aircraft don't move; they persist at their last known position until next refresh
+    if (contact.isAircraft) {
+      return true;
+    }
+
     contact.angle = (
       contact.angle +
       (contact.angularVelocity + (Math.random() * 3.2 - 1.6)) * movementFraction +
@@ -1164,8 +1169,6 @@ function renderLifeformRadar(options = {}) {
     sweepCount: 0,
     lastSweepRefreshAngle: 0
   };
-
-  seedLifeformContacts(lifeformRadarState);
 
   if (container === graphArea) {
     radar.addEventListener("pointerup", event => {
@@ -1289,19 +1292,24 @@ async function runLifeformScan(container = graphArea, options = {}) {
   try {
     if (lifeformRadarState) {
       const success = await loadAircraftContacts(lifeformRadarState);
-      if (!success && lifeformRadarState && lifeformRadarState.contacts.length === 0) {
-        // Fallback to simulated contacts if no aircraft found
+      if (!success) {
+        // Fallback to simulated contacts only if aircraft load completely failed
         primaryReadout.textContent = "Aircraft data unavailable. Running simulated scan...";
-        seedLifeformContacts(lifeformRadarState);
+        secondaryReadout.textContent = "No aircraft detected or network error.";
+        if (lifeformRadarState && lifeformRadarState.contacts.length === 0) {
+          seedLifeformContacts(lifeformRadarState);
+        }
       }
     }
   } catch (err) {
     console.error("Aircraft scan failed:", err);
-    // Fallback to simulated data
+    // Fallback to simulated data only if no aircraft loaded
     if (lifeformRadarState) {
       primaryReadout.textContent = "Using simulated scan.";
       secondaryReadout.textContent = "Live aircraft data temporarily unavailable.";
-      seedLifeformContacts(lifeformRadarState);
+      if (lifeformRadarState.contacts.length === 0) {
+        seedLifeformContacts(lifeformRadarState);
+      }
     }
   }
 }
@@ -1317,21 +1325,19 @@ function stopLifeformScan() {
   }
 
   const currentRadarState = lifeformRadarState;
-  const count = currentRadarState ? currentRadarState.currentCount : randomInt(1, 7);
-  const peak = currentRadarState ? currentRadarState.maxCount : count;
-
+  const hasAircraft = currentRadarState && currentRadarState.contacts.some(c => c.isAircraft);
+  
   stopLifeformRadar();
   renderLifeformRadar({ animateSweep: false, container: graphArea });
   lifeformScanActive = false;
 
-  if (count > 0 && currentRadarState && currentRadarState.contacts.some(c => c.isAircraft)) {
-    primaryReadout.textContent = `Aircraft detected: ${count} contact(s) within ${appSettings.radarDistance} miles.`;
-    secondaryReadout.textContent = "Radar sweep complete. Aircraft positions relative to current location.";
-    if (peak !== count) {
-      secondaryReadout.textContent += ` Peak contacts: ${peak}.`;
-    }
+  if (hasAircraft) {
+    const aircraftCount = currentRadarState.contacts.filter(c => c.isAircraft && !c.exiting).length;
+    primaryReadout.textContent = `Real aircraft: ${aircraftCount} contact(s) within ${appSettings.radarDistance} miles.`;
+    secondaryReadout.textContent = "Radar sweep complete. Aircraft refresh every 10 sweeps.";
   } else {
-    primaryReadout.textContent = `Contacts detected: ${count}.`;
+    const count = currentRadarState ? currentRadarState.currentCount : randomInt(1, 7);
+    primaryReadout.textContent = count > 0 ? `Simulated contacts: ${count}.` : "No contacts detected.";
     secondaryReadout.textContent = "Radar sweep stopped.";
   }
   statusLabel.textContent = "IDLE";
