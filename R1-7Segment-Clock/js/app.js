@@ -20,7 +20,9 @@ const digitsRoot = document.getElementById("digits");
 const state = {
   digitEls: [],
   brightness: 0.75,
-  timerId: null
+  timerId: null,
+  hudEl: null,
+  hudHideTimerId: null
 };
 
 function createDigitElement() {
@@ -91,18 +93,53 @@ function renderTime() {
   state.timerId = window.setTimeout(renderTime, delayUntilNextSecond);
 }
 
-function setBrightness(nextBrightness) {
+function getBrightnessPercent() {
+  const ratio = (state.brightness - BRIGHTNESS_MIN) / (BRIGHTNESS_MAX - BRIGHTNESS_MIN);
+  return Math.round(Math.max(0, Math.min(1, ratio)) * 100);
+}
+
+function showBrightnessHud() {
+  if (!state.hudEl) {
+    return;
+  }
+
+  state.hudEl.textContent = `${getBrightnessPercent()}%`;
+  state.hudEl.classList.add("visible");
+
+  if (state.hudHideTimerId) {
+    window.clearTimeout(state.hudHideTimerId);
+  }
+
+  state.hudHideTimerId = window.setTimeout(() => {
+    if (state.hudEl) {
+      state.hudEl.classList.remove("visible");
+    }
+  }, 520);
+}
+
+function setBrightness(nextBrightness, options = {}) {
+  const shouldShowHud = options.showHud === true;
   state.brightness = Math.min(BRIGHTNESS_MAX, Math.max(BRIGHTNESS_MIN, nextBrightness));
   document.documentElement.style.setProperty("--brightness", `${state.brightness.toFixed(2)}`);
+
+  if (shouldShowHud) {
+    showBrightnessHud();
+  }
 }
 
 function adjustBrightness(direction) {
   const delta = direction > 0 ? BRIGHTNESS_STEP : -BRIGHTNESS_STEP;
-  setBrightness(state.brightness + delta);
+  setBrightness(state.brightness + delta, { showHud: true });
 }
 
 function init() {
   buildClockDigits();
+
+  state.hudEl = document.createElement("div");
+  state.hudEl.className = "brightness-hud";
+  state.hudEl.textContent = `${getBrightnessPercent()}%`;
+  document.body.appendChild(state.hudEl);
+
   setBrightness(state.brightness);
   renderTime();
 }

@@ -129,6 +129,31 @@ body {
     0 0 14px rgba(255, 42, 18, 0.55);
 }
 
+.brightness-hud {
+  position: fixed;
+  right: 10px;
+  bottom: 12px;
+  min-width: 54px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 65, 44, 0.5);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #ff9e93;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 160ms ease-out, transform 160ms ease-out;
+}
+
+.brightness-hud.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .sim-controls {
   width: min(96vw, 430px);
   margin: 8px auto 0;
