@@ -641,7 +641,7 @@ function requestRabbitLocation() {
           requestId,
           message: "Return the current GPS location as JSON with latitude, longitude, and accuracy only.",
           useLLM: false,
-          wantsR1Response: true,
+          wantsR1Response: false,
           wantsJournalEntry: false
         })
       );
