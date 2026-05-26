@@ -57,7 +57,7 @@ body {
   grid-template-rows: auto auto;
   justify-content: center;
   align-content: center;
-  gap: clamp(1px, 0.6vw, 4px);
+  gap: 12px;
   filter: brightness(var(--brightness));
 }
 

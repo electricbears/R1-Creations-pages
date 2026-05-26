@@ -11,9 +11,9 @@ const SEGMENTS_BY_DIGIT = {
   "9": ["a", "b", "c", "d", "f", "g"]
 };
 
-const BRIGHTNESS_STEP = 0.06;
+const BRIGHTNESS_STEP = 0.036;
 const BRIGHTNESS_MIN = 0.15;
-const BRIGHTNESS_MAX = 1.6;
+const BRIGHTNESS_MAX = 1.02;
 
 const digitsRoot = document.getElementById("digits");
 
