@@ -38,8 +38,7 @@ body {
 
 .clock-wrap {
   width: min(100%, 420px);
-  height: min(100%, 720px);
-  aspect-ratio: 1 / 1;
+  height: auto;
   display: grid;
   place-items: center;
 }
@@ -53,12 +52,12 @@ body {
 
 .digits {
   width: 100%;
-  height: 100%;
+  height: auto;
   display: grid;
-  grid-template-rows: 1fr 1fr;
+  grid-template-rows: auto auto;
   justify-content: center;
   align-content: center;
-  gap: clamp(8px, 2.8vw, 14px);
+  gap: clamp(1px, 0.6vw, 4px);
   filter: brightness(var(--brightness));
 }
 
