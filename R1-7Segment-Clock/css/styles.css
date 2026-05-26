@@ -55,11 +55,10 @@ body {
   height: 100%;
   display: grid;
   grid-template-rows: 1fr 1fr;
-  justify-content: start;
+  justify-content: center;
   align-content: center;
   gap: clamp(8px, 2.8vw, 14px);
   filter: brightness(var(--brightness));
-  padding-left: clamp(8px, 2.8vw, 14px);
 }
 
 .digits-row {
