@@ -15,17 +15,16 @@ const BRIGHTNESS_STEP = 0.06;
 const BRIGHTNESS_MIN = 0.15;
 const BRIGHTNESS_MAX = 1.6;
 
+const appRoot = document.getElementById("app");
 const clockFace = document.getElementById("clock-face");
 const digitsRoot = document.getElementById("digits");
-const brightnessReadout = document.getElementById("brightness-readout");
-const orientationReadout = document.getElementById("orientation-readout");
 
 const state = {
   digitEls: [],
-  colonEl: null,
   brightness: 0.75,
   rotation: 0,
   timerId: null,
+  rotationPollId: null,
   orientationFallbackActive: false,
   orientationFallbackLastAt: 0
 };
@@ -56,16 +55,23 @@ function buildClockDigits() {
 
   state.digitEls.push(first, second, third, fourth);
 
-  digitsRoot.appendChild(first.digit);
-  digitsRoot.appendChild(second.digit);
+  const topRow = document.createElement("div");
+  topRow.className = "digits-row";
+  topRow.appendChild(first.digit);
+  topRow.appendChild(second.digit);
 
-  const colon = document.createElement("div");
-  colon.className = "colon on";
-  digitsRoot.appendChild(colon);
-  state.colonEl = colon;
+  const rowColon = document.createElement("div");
+  rowColon.className = "row-colon";
+  rowColon.textContent = ":";
+  topRow.appendChild(rowColon);
 
-  digitsRoot.appendChild(third.digit);
-  digitsRoot.appendChild(fourth.digit);
+  const bottomRow = document.createElement("div");
+  bottomRow.className = "digits-row";
+  bottomRow.appendChild(third.digit);
+  bottomRow.appendChild(fourth.digit);
+
+  digitsRoot.appendChild(topRow);
+  digitsRoot.appendChild(bottomRow);
 }
 
 function setDigitValue(digitRef, value) {
@@ -79,18 +85,12 @@ function setDigitValue(digitRef, value) {
 
 function renderTime() {
   const now = new Date();
-  const time = now.toLocaleTimeString([], {
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit"
-  }).replace(":", "");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const time = `${hours}${minutes}`;
 
   for (let i = 0; i < 4; i++) {
     setDigitValue(state.digitEls[i], time[i]);
-  }
-
-  if (state.colonEl) {
-    state.colonEl.classList.toggle("on", now.getSeconds() % 2 === 0);
   }
 
   const delayUntilNextSecond = 1000 - now.getMilliseconds();
@@ -100,7 +100,6 @@ function renderTime() {
 function setBrightness(nextBrightness) {
   state.brightness = Math.min(BRIGHTNESS_MAX, Math.max(BRIGHTNESS_MIN, nextBrightness));
   document.documentElement.style.setProperty("--brightness", `${state.brightness.toFixed(2)}`);
-  brightnessReadout.textContent = `BRIGHTNESS ${Math.round((state.brightness / BRIGHTNESS_MAX) * 100)}%`;
 }
 
 function adjustBrightness(direction) {
@@ -138,8 +137,7 @@ function normalizeRightAngle(value) {
 function applyRotation(rotationDeg) {
   const nextRotation = normalizeRightAngle(rotationDeg);
   state.rotation = nextRotation;
-  clockFace.style.transform = `rotate(${nextRotation}deg)`;
-  orientationReadout.textContent = `ROTATION ${nextRotation}deg`;
+  appRoot.style.transform = `rotate(${nextRotation}deg)`;
 }
 
 function detectScreenRotation() {
@@ -217,6 +215,15 @@ function bindOrientationUpdates() {
   });
 
   window.addEventListener("deviceorientation", updateRotationFromDeviceOrientation, true);
+
+  // Some webviews skip orientation change events, so poll the exposed angle.
+  state.rotationPollId = window.setInterval(updateRotationFromScreen, 500);
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      updateRotationFromScreen();
+    }
+  });
 }
 
 function init() {
