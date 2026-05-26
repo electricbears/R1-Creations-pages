@@ -101,17 +101,9 @@ function adjustBrightness(direction) {
   setBrightness(state.brightness + delta);
 }
 
-function bindWheelBrightness() {
-  window.addEventListener("wheel", event => {
-    event.preventDefault();
-    adjustBrightness(event.deltaY < 0 ? 1 : -1);
-  }, { passive: false });
-}
-
 function init() {
   buildClockDigits();
   setBrightness(state.brightness);
-  bindWheelBrightness();
   renderTime();
 }
 
