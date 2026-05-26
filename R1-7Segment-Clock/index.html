@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0a0000" />
   <title>R1 7-Segment Clock</title>
-  <link rel="stylesheet" href="css/styles.css?v=5f372bb" />
+  <link rel="stylesheet" href="css/styles.css" id="clock-stylesheet" />
 </head>
 <body>
   <main id="app" aria-live="polite" aria-label="24 hour red LED clock">
@@ -16,7 +16,24 @@
     </div>
   </main>
 
-  <script src="js/hardware.js?v=5f372bb"></script>
-  <script src="js/app.js?v=5f372bb"></script>
+  <script>
+    window.APP_VERSION = "3958c69";
+
+    (function() {
+      const version = encodeURIComponent(window.APP_VERSION || "dev");
+
+      const stylesheet = document.getElementById("clock-stylesheet");
+      if (stylesheet) {
+        stylesheet.href = `css/styles.css?v=${version}`;
+      }
+
+      const scriptPaths = ["js/hardware.js", "js/app.js"];
+      scriptPaths.forEach(function(path) {
+        const script = document.createElement("script");
+        script.src = `${path}?v=${version}`;
+        document.body.appendChild(script);
+      });
+    })();
+  </script>
 </body>
 </html>
