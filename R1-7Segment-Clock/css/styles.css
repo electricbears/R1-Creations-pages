@@ -34,9 +34,6 @@ body {
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(20, 2, 2, 0.92), rgba(5, 0, 0, 0.95));
   box-shadow: 0 0 28px rgba(255, 35, 15, 0.12), inset 0 0 28px rgba(255, 60, 40, 0.08);
-  transform: rotate(0deg);
-  transform-origin: center;
-  transition: transform 220ms ease-out;
 }
 
 .clock-wrap {
@@ -51,9 +48,6 @@ body {
   height: 100%;
   display: grid;
   place-items: center;
-  transform: rotate(0deg);
-  transform-origin: center;
-  transition: transform 220ms ease-out;
 }
 
 .digits {
@@ -61,16 +55,17 @@ body {
   height: 100%;
   display: grid;
   grid-template-rows: 1fr 1fr;
-  justify-content: center;
+  justify-content: start;
   align-content: center;
   gap: clamp(8px, 2.8vw, 14px);
   filter: brightness(var(--brightness));
+  padding-left: clamp(8px, 2.8vw, 14px);
 }
 
 .digits-row {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: clamp(4px, 2.3vw, 10px);
 }
 

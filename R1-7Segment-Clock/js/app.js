@@ -15,18 +15,12 @@ const BRIGHTNESS_STEP = 0.06;
 const BRIGHTNESS_MIN = 0.15;
 const BRIGHTNESS_MAX = 1.6;
 
-const appRoot = document.getElementById("app");
-const clockFace = document.getElementById("clock-face");
 const digitsRoot = document.getElementById("digits");
 
 const state = {
   digitEls: [],
   brightness: 0.75,
-  rotation: 0,
-  timerId: null,
-  rotationPollId: null,
-  orientationFallbackActive: false,
-  orientationFallbackLastAt: 0
+  timerId: null
 };
 
 function createDigitElement() {
@@ -107,95 +101,6 @@ function adjustBrightness(direction) {
   setBrightness(state.brightness + delta);
 }
 
-function normalizeRightAngle(value) {
-  const raw = Number(value);
-  if (!Number.isFinite(raw)) {
-    return 0;
-  }
-
-  const wrapped = ((raw % 360) + 360) % 360;
-  const snapTargets = [0, 90, 180, 270];
-  let closest = 0;
-  let closestDistance = Number.POSITIVE_INFINITY;
-
-  snapTargets.forEach(target => {
-    const distance = Math.min(
-      Math.abs(wrapped - target),
-      Math.abs(wrapped - target + 360),
-      Math.abs(wrapped - target - 360)
-    );
-
-    if (distance < closestDistance) {
-      closestDistance = distance;
-      closest = target;
-    }
-  });
-
-  return closest;
-}
-
-function applyRotation(rotationDeg) {
-  const nextRotation = normalizeRightAngle(rotationDeg);
-  state.rotation = nextRotation;
-  appRoot.style.transform = `rotate(${nextRotation}deg)`;
-}
-
-function detectScreenRotation() {
-  if (window.screen && window.screen.orientation && Number.isFinite(window.screen.orientation.angle)) {
-    return window.screen.orientation.angle;
-  }
-
-  if (Number.isFinite(window.orientation)) {
-    return window.orientation;
-  }
-
-  return null;
-}
-
-function updateRotationFromScreen() {
-  const angle = detectScreenRotation();
-  if (angle === null) {
-    return false;
-  }
-
-  state.orientationFallbackActive = false;
-  applyRotation(angle);
-  return true;
-}
-
-function updateRotationFromDeviceOrientation(event) {
-  if (!state.orientationFallbackActive && updateRotationFromScreen()) {
-    return;
-  }
-
-  const now = Date.now();
-  if (now - state.orientationFallbackLastAt < 200) {
-    return;
-  }
-  state.orientationFallbackLastAt = now;
-
-  const beta = Number(event.beta);
-  const gamma = Number(event.gamma);
-
-  if (!Number.isFinite(beta) || !Number.isFinite(gamma)) {
-    return;
-  }
-
-  state.orientationFallbackActive = true;
-
-  if (Math.abs(gamma) >= 35) {
-    applyRotation(gamma > 0 ? 90 : 270);
-    return;
-  }
-
-  if (beta <= -35) {
-    applyRotation(180);
-    return;
-  }
-
-  applyRotation(0);
-}
-
 function bindWheelBrightness() {
   window.addEventListener("wheel", event => {
     event.preventDefault();
@@ -203,41 +108,16 @@ function bindWheelBrightness() {
   }, { passive: false });
 }
 
-function bindOrientationUpdates() {
-  updateRotationFromScreen();
-
-  if (window.screen && window.screen.orientation && typeof window.screen.orientation.addEventListener === "function") {
-    window.screen.orientation.addEventListener("change", updateRotationFromScreen);
-  }
-
-  window.addEventListener("orientationchange", () => {
-    window.setTimeout(updateRotationFromScreen, 20);
-  });
-
-  window.addEventListener("deviceorientation", updateRotationFromDeviceOrientation, true);
-
-  // Some webviews skip orientation change events, so poll the exposed angle.
-  state.rotationPollId = window.setInterval(updateRotationFromScreen, 500);
-
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      updateRotationFromScreen();
-    }
-  });
-}
-
 function init() {
   buildClockDigits();
   setBrightness(state.brightness);
   bindWheelBrightness();
-  bindOrientationUpdates();
   renderTime();
 }
 
 window.segmentClock = {
   adjustBrightness,
-  setBrightness,
-  applyRotation
+  setBrightness
 };
 
 init();

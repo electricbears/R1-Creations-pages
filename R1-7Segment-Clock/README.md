@@ -5,7 +5,6 @@ A basic red LED-style 7-segment digital clock for Rabbit R1.
 ## Features
 
 - Red 7-segment HH:MM clock on a black background
-- Display rotation follows device orientation when available
 - Scroll wheel controls brightness (brighter/darker)
 - Desktop simulation controls for wheel input
 
@@ -19,7 +18,7 @@ A basic red LED-style 7-segment digital clock for Rabbit R1.
 
 - index.html: app shell
 - css/styles.css: segment display and UI styles
-- js/app.js: clock rendering, brightness, orientation handling
+- js/app.js: clock rendering and brightness handling
 - js/hardware.js: hardware event bridge and desktop simulation
 
 ## Local Run
