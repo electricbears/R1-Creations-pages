@@ -61,11 +61,11 @@ function relayNativeScroll(direction) {
 }
 
 function cycleFromScroll(direction) {
-  const viewingView = document.getElementById('viewing-view');
-  const isViewing = viewingView && viewingView.classList.contains('active');
-  const settingsView = document.getElementById('settings-view');
-  const isSettings = settingsView && settingsView.classList.contains('active');
-  
+  const viewingView = document.getElementById("viewing-view");
+  const isViewing = viewingView && viewingView.classList.contains("active");
+  const settingsView = document.getElementById("settings-view");
+  const isSettings = settingsView && settingsView.classList.contains("active");
+
   if (isViewing) {
     const eventName = direction > 0 ? "scrollDown" : "scrollUp";
     relayHardwareEventToIframe(eventName);
@@ -83,16 +83,20 @@ function launchFromSideClick() {
   const now = Date.now();
   const isDoubleClick = (now - lastSideClickTime) < 300; // 300ms threshold
   lastSideClickTime = now;
-  
-  const viewingView = document.getElementById('viewing-view');
-  const isViewing = viewingView && viewingView.classList.contains('active');
-  const settingsView = document.getElementById('settings-view');
-  const isSettings = settingsView && settingsView.classList.contains('active');
-  
+
+  const viewingView = document.getElementById("viewing-view");
+  const isViewing = viewingView && viewingView.classList.contains("active");
+  const settingsView = document.getElementById("settings-view");
+  const isSettings = settingsView && settingsView.classList.contains("active");
+
   if (isViewing && isDoubleClick) {
-    // Double click returns to main screen
+    // Double click requests app close and return to home.
     if (window.launcher) {
-      window.launcher.goBack();
+      if (typeof window.launcher.exitToR1Home === "function") {
+        window.launcher.exitToR1Home();
+      } else {
+        window.launcher.goBack();
+      }
     }
     return;
   }
@@ -108,9 +112,9 @@ function launchFromSideClick() {
     window.launcher.toggleSelectedSetting();
     return;
   }
-  
-  const backBtn = document.getElementById('back-btn');
-  if (isViewing && backBtn && backBtn.style.display !== 'none') {
+
+  const backBtn = document.getElementById("back-btn");
+  if (isViewing && backBtn && backBtn.style.display !== "none") {
     relayHardwareEventToIframe("sideClick");
     relayNativeTapAtCenter();
   } else if (window.launcher) {
@@ -128,10 +132,10 @@ function isR1Runtime() {
 }
 
 function bindSimulatedControls() {
-    if (window.__launcherSimControlsBound || isR1Runtime()) {
-     return;
+  if (window.__launcherSimControlsBound || isR1Runtime()) {
+    return;
   }
-    window.__launcherSimControlsBound = true;
+  window.__launcherSimControlsBound = true;
 
   const controls = document.createElement("div");
   controls.className = "sim-controls";
@@ -204,10 +208,10 @@ function bindSimulatedControls() {
 }
 
 function bindR1HardwareEvents() {
-    if (window.__launcherHardwareBound) {
-     return;
+  if (window.__launcherHardwareBound) {
+    return;
   }
-    window.__launcherHardwareBound = true;
+  window.__launcherHardwareBound = true;
 
   window.addEventListener("scrollUp", () => cycleFromScroll(-1));
   window.addEventListener("scrollDown", () => cycleFromScroll(1));
@@ -216,4 +220,3 @@ function bindR1HardwareEvents() {
 
 bindR1HardwareEvents();
 bindSimulatedControls();
-

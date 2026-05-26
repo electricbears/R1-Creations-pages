@@ -1,0 +1,18 @@
+[
+  {
+    "id": "plex",
+    "name": "Plex",
+    "description": "Open Plex web app.",
+    "url": "https://app.plex.tv/desktop/",
+    "icon": "PLX",
+    "embedInIframe": false
+  },
+  {
+    "id": "home-assistant",
+    "name": "Home Assistant",
+    "description": "Open Home Assistant dashboard.",
+    "url": "https://www.home-assistant.io/",
+    "icon": "HMS",
+    "embedInIframe": true
+  }
+]

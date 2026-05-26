@@ -1,148 +1,126 @@
-const SETTINGS_STORAGE_KEY = "r1-launcher-settings-v1";
-const DEFAULT_SETTINGS = {
-  systemSounds: true,
-  voice: true
-};
-
-const SETTINGS_OPTIONS = [
-  {
-    key: "systemSounds",
-    label: "System Sounds",
-    description: "Play launcher feedback tones."
-  },
-  {
-    key: "voice",
-    label: "Voice",
-    description: "Allow spoken assistant responses."
-  }
-];
-
-const TARGETS = [
-  {
-    id: "debug-receiver",
-    name: "Debug Receiver",
-    kind: "debug",
-    typeLabel: "Event Debug",
-    description: "Shows all incoming hardware, mouse, wheel, touch, and message events.",
-    launchUrl: "https://electricbears.github.io/R1-Creations-pages/R1-Launcher/debug-receiver.html",
-    launchMode: "web",
-    embedInIframe: true
-  },
+const WORKSPACE_TARGETS = [
   {
     id: "tricorder",
     name: "TNG Tricorder",
-    kind: "custom",
-    typeLabel: "Custom Creation",
-    description: "Launch a local creation hosted in this repository.",
-    launchUrl: "https://electricbears.github.io/R1-Creations-pages/TNG-Tricorder/",
+    icon: "TRI",
+    kind: "workspace",
+    typeLabel: "Workspace App",
+    description: "LCARS-inspired tricorder scan interface.",
+    launchUrl: "../TNG-Tricorder/",
     launchMode: "web",
     embedInIframe: true
   },
   {
     id: "hulkify",
     name: "Hulkify",
-    kind: "custom",
-    typeLabel: "Camera Creation",
-    description: "Camera viewfinder that captures and sends a Hulk-style magic photo prompt.",
-    launchUrl: "https://electricbears.github.io/R1-Creations-pages/Hulkify/",
+    icon: "HLK",
+    kind: "workspace",
+    typeLabel: "Workspace App",
+    description: "Camera creation with Hulk-style magic photo flow.",
+    launchUrl: "../Hulkify/",
     launchMode: "web",
     embedInIframe: true
   },
   {
-    id: "plex",
-    name: "Plex",
-    kind: "external",
-    typeLabel: "External Website",
-    description: "Open the hosted Plex web app.",
-    launchUrl: "https://app.plex.tv/desktop/",
-    launchMode: "web",
-    embedInIframe: false
-  },
-  {
-    id: "home-assistant",
-    name: "Home Assistant",
-    kind: "external",
-    typeLabel: "External Website",
-    description: "Open your Home Assistant dashboard endpoint.",
-    launchUrl: "https://www.home-assistant.io/",
+    id: "bbc-news",
+    name: "BBC News",
+    icon: "BBC",
+    kind: "workspace",
+    typeLabel: "Workspace App",
+    description: "LCARS-themed BBC headline reader.",
+    launchUrl: "../BBC-News/",
     launchMode: "web",
     embedInIframe: true
   },
   {
-    id: "launcher-settings",
-    name: "Settings",
-    kind: "launcher",
-    typeLabel: "Launcher",
-    description: "Configure system sounds and voice behavior.",
-    launchMode: "settings"
-  },
-  {
-    id: "settings",
-    name: "Device Settings",
-    kind: "builtin",
-    typeLabel: "Built-in App",
-    description: "Ask the assistant to open device settings.",
-    launchUrl: "rabbit://settings",
-    launchMode: "deeplink",
-    llmCommand: "Open settings",
-    llmSilent: true
-  },
-  {
-    id: "creation-sample",
-    name: "Sample Creation",
-    kind: "creation",
-    typeLabel: "Installed Creation",
-    description: "Placeholder for launching another installed creation by ID.",
-    launchUrl: "rabbit://creation/sample-id",
-    launchMode: "creation"
+    id: "segment-clock",
+    name: "7 Segment Clock",
+    icon: "CLK",
+    kind: "workspace",
+    typeLabel: "Workspace App",
+    description: "Red LED-style 24-hour clock with wheel brightness.",
+    launchUrl: "../R1-7Segment-Clock/",
+    launchMode: "web",
+    embedInIframe: true
   }
 ];
 
-let currentIndex = 0;
-let currentSettingsIndex = 0;
-let launcherSettings = loadSettings();
-
+const launchGrid = document.getElementById("launch-grid");
+const targetIcon = document.getElementById("target-icon");
 const targetName = document.getElementById("target-name");
-const targetType = document.getElementById("target-type");
-const targetDescription = document.getElementById("target-description");
 const statusPrimary = document.getElementById("status-primary");
 const statusSecondary = document.getElementById("status-secondary");
-const launchItems = document.getElementById("launch-items");
 const indexLabel = document.getElementById("index-label");
 const typeLabel = document.getElementById("type-label");
-const settingsItems = document.getElementById("settings-items");
-const settingsHint = document.getElementById("settings-hint");
 
-function loadSettings() {
-  try {
-    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) {
-      return { ...DEFAULT_SETTINGS };
-    }
+const state = {
+  currentIndex: 0,
+  targets: [...WORKSPACE_TARGETS]
+};
 
-    const parsed = JSON.parse(raw);
-    return {
-      systemSounds: parsed.systemSounds !== false,
-      voice: parsed.voice !== false
-    };
-  } catch (_error) {
-    return { ...DEFAULT_SETTINGS };
+function setStatus(primaryText, secondaryText) {
+  if (statusPrimary) {
+    statusPrimary.textContent = primaryText;
+  }
+  if (statusSecondary && typeof secondaryText === "string") {
+    statusSecondary.textContent = secondaryText;
   }
 }
 
-function saveSettings() {
-  try {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(launcherSettings));
-  } catch (_error) {
-    // Ignore persistence failures in constrained runtimes.
+function sanitizeExternalTarget(raw) {
+  if (!raw || typeof raw !== "object") {
+    return null;
   }
+
+  const name = String(raw.name || "").trim();
+  const url = String(raw.url || "").trim();
+  if (!name || !url) {
+    return null;
+  }
+
+  return {
+    id: String(raw.id || name.toLowerCase().replace(/[^a-z0-9]+/g, "-")).trim(),
+    name,
+    icon: String(raw.icon || name.slice(0, 3)).toUpperCase().slice(0, 3),
+    kind: "external",
+    typeLabel: "External Site",
+    description: String(raw.description || "Launch external website."),
+    launchUrl: url,
+    launchMode: "web",
+    embedInIframe: raw.embedInIframe !== false
+  };
+}
+
+async function loadExternalTargets() {
+  try {
+    const response = await fetch("data/external-sites.json", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`External list unavailable (${response.status})`);
+    }
+
+    const payload = await response.json();
+    if (!Array.isArray(payload)) {
+      throw new Error("External list must be a JSON array");
+    }
+
+    const externalTargets = payload
+      .map(sanitizeExternalTarget)
+      .filter(Boolean);
+
+    state.targets = [...WORKSPACE_TARGETS, ...externalTargets];
+    state.currentIndex = Math.min(state.currentIndex, Math.max(0, state.targets.length - 1));
+
+    render();
+  } catch (error) {
+    setStatus("External List Error", error.message);
+  }
+}
+
+function getCurrentTarget() {
+  return state.targets[state.currentIndex] || state.targets[0];
 }
 
 function playUiTone(kind) {
-  if (!launcherSettings.systemSounds) {
-    return;
-  }
-
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx) {
     return;
@@ -158,10 +136,10 @@ function playUiTone(kind) {
     const gain = ctx.createGain();
     const now = ctx.currentTime;
     const profile = kind === "confirm"
-      ? { freq: 700, duration: 0.05, volume: 0.03 }
-      : { freq: 520, duration: 0.035, volume: 0.025 };
+      ? { freq: 680, duration: 0.06, volume: 0.035 }
+      : { freq: 480, duration: 0.04, volume: 0.024 };
 
-    osc.type = "sine";
+    osc.type = "triangle";
     osc.frequency.setValueAtTime(profile.freq, now);
     gain.gain.setValueAtTime(profile.volume, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + profile.duration);
@@ -171,259 +149,163 @@ function playUiTone(kind) {
     osc.start(now);
     osc.stop(now + profile.duration);
   } catch (_error) {
-    // Audio can fail on some webviews before user gesture; ignore safely.
+    // Ignore webview audio gesture restrictions.
   }
 }
 
-function isVoiceEnabled() {
-  return launcherSettings.voice;
-}
+function renderGrid() {
+  launchGrid.innerHTML = "";
 
-function isSettingsViewActive() {
-  const settingsView = document.getElementById("settings-view");
-  return Boolean(settingsView && settingsView.classList.contains("active"));
-}
+  state.targets.forEach((target, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "launch-button" + (index === state.currentIndex ? " active" : "");
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", index === state.currentIndex ? "true" : "false");
 
-function getCurrentTarget() {
-  return TARGETS[currentIndex];
-}
-
-function cycleTarget(delta) {
-  currentIndex = (currentIndex + delta + TARGETS.length) % TARGETS.length;
-  playUiTone("tick");
-  render();
-}
-
-function renderList() {
-  launchItems.innerHTML = "";
-
-  TARGETS.forEach((item, index) => {
-    const row = document.createElement("div");
-    row.className = "launch-item";
-    if (index === currentIndex) {
-      row.classList.add("active");
-    }
-    row.textContent = item.name;
-    launchItems.appendChild(row);
-  });
-}
-
-function render() {
-  const target = getCurrentTarget();
-  targetName.textContent = target.name;
-  targetType.textContent = target.typeLabel;
-  targetDescription.textContent = target.description;
-  indexLabel.textContent = `${currentIndex + 1}/${TARGETS.length}`;
-  typeLabel.textContent = target.kind;
-
-  statusPrimary.textContent = "Ready";
-  statusSecondary.textContent = `Selected ${target.name}. Press side button to launch.`;
-
-  renderList();
-}
-
-function renderSettingsList() {
-  settingsItems.innerHTML = "";
-
-  SETTINGS_OPTIONS.forEach((item, index) => {
-    const row = document.createElement("div");
-    row.className = "settings-item";
-    if (index === currentSettingsIndex) {
-      row.classList.add("active");
-    }
+    const icon = document.createElement("div");
+    icon.className = "launch-button-icon";
+    icon.textContent = target.icon;
 
     const name = document.createElement("div");
-    name.className = "settings-item-name";
-    name.textContent = item.label;
+    name.className = "launch-button-name";
+    name.textContent = target.name;
 
-    const value = document.createElement("div");
-    const isOn = launcherSettings[item.key];
-    value.className = "settings-item-value" + (isOn ? "" : " off");
-    value.textContent = isOn ? "ON" : "OFF";
+    button.appendChild(icon);
+    button.appendChild(name);
 
-    row.appendChild(name);
-    row.appendChild(value);
-    settingsItems.appendChild(row);
+    button.addEventListener("click", () => {
+      state.currentIndex = index;
+      playUiTone("tick");
+      render();
+    });
+
+    button.addEventListener("dblclick", () => {
+      state.currentIndex = index;
+      launchCurrentTarget();
+    });
+
+    launchGrid.appendChild(button);
   });
-
-  const active = SETTINGS_OPTIONS[currentSettingsIndex];
-  settingsHint.textContent = active.description;
 }
 
-function cycleSettingsOption(delta) {
-  currentSettingsIndex = (currentSettingsIndex + delta + SETTINGS_OPTIONS.length) % SETTINGS_OPTIONS.length;
-  playUiTone("tick");
-  renderSettingsList();
-}
-
-function toggleSelectedSetting() {
-  const selected = SETTINGS_OPTIONS[currentSettingsIndex];
-  if (!selected) {
+function renderSelectedTarget() {
+  const target = getCurrentTarget();
+  if (!target) {
     return;
   }
 
-  const prevSounds = launcherSettings.systemSounds;
-  launcherSettings[selected.key] = !launcherSettings[selected.key];
-  saveSettings();
-  renderSettingsList();
-
-  settingsHint.textContent = `${selected.label}: ${launcherSettings[selected.key] ? "ON" : "OFF"}`;
-
-  if (prevSounds || launcherSettings.systemSounds) {
-    playUiTone("confirm");
-  }
+  targetIcon.textContent = target.icon;
+  targetName.textContent = target.name;
+  indexLabel.textContent = `${state.currentIndex + 1}/${state.targets.length}`;
+  typeLabel.textContent = target.kind;
 }
 
-function openLauncherSettings() {
-  currentSettingsIndex = 0;
-  renderSettingsList();
-  showView("settings-view");
+function render() {
+  renderSelectedTarget();
+  renderGrid();
+}
+
+function cycleTarget(delta) {
+  if (!state.targets.length) {
+    return;
+  }
+
+  state.currentIndex = (state.currentIndex + delta + state.targets.length) % state.targets.length;
+  playUiTone("tick");
+  render();
 }
 
 function launchWebTarget(url) {
   window.location.href = url;
 }
 
-function launchViaBridge(target) {
-  if (typeof PluginMessageHandler === "undefined") {
-    statusPrimary.textContent = "Bridge Missing";
-    statusSecondary.textContent = "PluginMessageHandler unavailable in this runtime.";
-    return;
+function showView(viewName) {
+  document.getElementById("selector-view").classList.remove("active");
+  document.getElementById("viewing-view").classList.remove("active");
+  document.getElementById(viewName).classList.add("active");
+
+  const app = document.getElementById("app");
+  const backBtn = document.getElementById("back-btn");
+  if (viewName === "viewing-view") {
+    backBtn.style.display = "block";
+    app.classList.add("fullscreen");
+  } else {
+    backBtn.style.display = "none";
+    app.classList.remove("fullscreen");
   }
-
-  const payload = {
-    type: "launch",
-    id: target.id,
-    mode: target.launchMode,
-    url: target.launchUrl
-  };
-
-  PluginMessageHandler.postMessage(JSON.stringify(payload));
 }
 
-function launchViaLLMCommand(commandText, options) {
-  const opts = options || {};
-  const silent = Boolean(opts.silent) || !launcherSettings.voice;
-
-  if (typeof window.launcherSpeak === "function") {
-    window.launcherSpeak(commandText, {
-      silent,
-      rawMessage: true,
-      wantsJournalEntry: false
-    });
-    return true;
-  }
-
-  if (typeof PluginMessageHandler === "undefined") {
-    return false;
-  }
-
-  PluginMessageHandler.postMessage(
-    JSON.stringify({
-      message: commandText,
-      useLLM: true,
-      wantsR1Response: !silent,
-      wantsJournalEntry: false
-    })
-  );
-  return true;
+function launchInIframe(url) {
+  const iframe = document.getElementById("target-iframe");
+  iframe.src = url;
+  showView("viewing-view");
+  setStatus("Viewing", "Loading selected app...");
 }
 
 function launchCurrentTarget() {
   const target = getCurrentTarget();
-
-  statusPrimary.textContent = "Launching";
-  statusSecondary.textContent = `${target.name} (${target.kind})`;
+  if (!target) {
+    return;
+  }
 
   playUiTone("confirm");
-
-  if (target.launchMode === "settings") {
-    openLauncherSettings();
-    return;
-  }
-
-  if (target.llmCommand) {
-    const sent = launchViaLLMCommand(target.llmCommand, { silent: target.llmSilent });
-    if (sent) {
-      statusPrimary.textContent = "Request Sent";
-      statusSecondary.textContent = `Sent LLM command: ${target.llmCommand}`;
-    } else {
-      statusPrimary.textContent = "Bridge Missing";
-      statusSecondary.textContent = "PluginMessageHandler unavailable in this runtime.";
-    }
-    return;
-  }
+  setStatus("Launching", `${target.name} (${target.kind})`);
 
   if (target.launchMode === "web") {
     if (target.embedInIframe) {
       launchInIframe(target.launchUrl);
     } else {
-      statusPrimary.textContent = "Opening";
-      statusSecondary.textContent = `${target.name} blocks iframe embedding. Opening directly.`;
+      setStatus("Opening", "Opening in top-level browser view.");
       launchWebTarget(target.launchUrl);
     }
-    return;
   }
-
-  launchViaBridge(target);
-}
-
-function showView(viewName) {
-  document.getElementById('selector-view').classList.remove('active');
-  document.getElementById('viewing-view').classList.remove('active');
-  document.getElementById('settings-view').classList.remove('active');
-  document.getElementById(viewName).classList.add('active');
-  
-  const app = document.getElementById('app');
-  const backBtn = document.getElementById('back-btn');
-  if (viewName === 'viewing-view') {
-    backBtn.style.display = 'block';
-    app.classList.add('fullscreen');
-  } else if (viewName === 'settings-view') {
-    backBtn.style.display = 'block';
-    app.classList.remove('fullscreen');
-  } else {
-    backBtn.style.display = 'none';
-    app.classList.remove('fullscreen');
-  }
-}
-
-function launchInIframe(url) {
-  const iframe = document.getElementById('target-iframe');
-  iframe.src = url;
-  showView('viewing-view');
-  statusPrimary.textContent = 'Viewing';
-  statusSecondary.textContent = 'Loading target...';
 }
 
 function goBack() {
-  if (document.getElementById('viewing-view').classList.contains('active')) {
-    const iframe = document.getElementById('target-iframe');
-    iframe.src = '';
-  }
-  showView('selector-view');
+  const iframe = document.getElementById("target-iframe");
+  iframe.src = "";
+  showView("selector-view");
+  setStatus("Ready", "");
   render();
 }
 
-window.launcherSettings = {
-  isVoiceEnabled,
-  isSystemSoundsEnabled: function () {
-    return launcherSettings.systemSounds;
-  },
-  getAll: function () {
-    return { ...launcherSettings };
+function exitToR1Home() {
+  // Try native bridge hints first, then fall back to returning to launcher selector.
+  if (typeof PluginMessageHandler !== "undefined") {
+    const payloads = [
+      { type: "navigation", action: "home", source: "launcher" },
+      { type: "app", action: "close", source: "launcher" }
+    ];
+
+    payloads.forEach(payload => {
+      try {
+        PluginMessageHandler.postMessage(JSON.stringify(payload));
+      } catch (_error) {
+        // Ignore bridge payload failures and continue fallbacks.
+      }
+    });
   }
-};
+
+  if (typeof window.close === "function") {
+    try {
+      window.close();
+    } catch (_error) {
+      // Ignore close restrictions in embedded webviews.
+    }
+  }
+
+  goBack();
+}
 
 window.launcher = {
   cycleTarget,
   launchCurrentTarget,
   goBack,
-  cycleSettingsOption,
-  toggleSelectedSetting,
-  isSettingsViewActive
+  exitToR1Home
 };
 
-document.getElementById('back-btn').addEventListener('click', goBack);
+document.getElementById("back-btn").addEventListener("click", goBack);
 
 render();
+loadExternalTargets();

@@ -11,33 +11,24 @@
     <header class="launcher-top">
       <button id="back-btn" class="back-button" style="display: none;" aria-label="Back to launcher">← BACK</button>
       <div id="header-content" class="header-content">
-        <div class="app-title">R1 LAUNCHER</div>
-        <div class="app-subtitle">APP HUB</div>
+        <div class="app-title">Applications</div>
       </div>
     </header>
 
     <main class="launcher-main">
       <div id="selector-view" class="view active">
-        <section class="card launch-target" aria-live="polite">
-          <div class="card-label">Selected</div>
+        <section class="card selected-target" aria-live="polite">
+          <div id="target-icon" class="target-icon">TRI</div>
           <div id="target-name" class="target-name">TNG Tricorder</div>
-          <div id="target-type" class="target-type">Custom Creation</div>
-          <div id="target-description" class="target-description">
-            Launch a local creation hosted in this repository.
-          </div>
         </section>
 
-        <section class="card launch-list">
-          <div class="card-label">Catalog</div>
-          <div id="launch-items" class="launch-items" role="listbox" aria-label="Launch targets"></div>
+        <section class="card launch-grid-card">
+          <div class="card-label">Launch Grid</div>
+          <div id="launch-grid" class="launch-grid" role="listbox" aria-label="Launch targets"></div>
         </section>
 
         <section class="card launch-status" aria-live="polite">
-          <div class="card-label">Status</div>
           <div id="status-primary" class="status-primary">Ready</div>
-          <div id="status-secondary" class="status-secondary">
-            Rotate wheel to choose. Press side button to launch.
-          </div>
         </section>
       </div>
 
@@ -46,20 +37,11 @@
           <iframe id="target-iframe" tabindex="-1" allow="camera; microphone; autoplay" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals"></iframe>
         </div>
       </div>
-
-      <div id="settings-view" class="view">
-        <section class="card settings-panel" aria-live="polite">
-          <div class="card-label">Launcher Settings</div>
-          <div class="settings-help">Wheel: choose setting. Side: toggle. Double side: back.</div>
-          <div id="settings-items" class="settings-items" role="listbox" aria-label="Launcher settings"></div>
-          <div id="settings-hint" class="settings-hint">All settings default to ON.</div>
-        </section>
-      </div>
     </main>
 
     <footer class="launcher-bottom">
-      <span id="index-label">1/5</span>
-      <span id="type-label">custom</span>
+      <span id="index-label">1/1</span>
+      <span id="type-label">workspace</span>
     </footer>
   </div>
 
