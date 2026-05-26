@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0000" />
+  <title>R1 7-Segment Clock</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <main id="app" aria-live="polite">
+    <div class="clock-wrap">
+      <div class="clock-face" id="clock-face">
+        <div class="digits" id="digits" aria-label="Current time"></div>
+      </div>
+    </div>
+    <div class="readout">
+      <div class="readout-row" id="brightness-readout">BRIGHTNESS 75%</div>
+      <div class="readout-row" id="orientation-readout">ROTATION 0deg</div>
+      <div class="readout-help">Wheel up/down changes brightness. Rotation follows device orientation when available.</div>
+    </div>
+  </main>
+
+  <script src="js/hardware.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
