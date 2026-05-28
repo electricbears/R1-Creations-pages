@@ -58,6 +58,11 @@
     {
       "title": "Startrek TNG",
       "prompt": "Take a picture and transform it into the style of Star Trek: The Next Generation, characterized by its futuristic and sleek design elements. The image should evoke the aesthetic of the 24th century, with clean lines, advanced technology, and a sense of exploration and optimism. Style cues can be drawn from the show's iconic uniforms, starship interiors, and the overall visual language of the series."
-    }
+    },
+      {
+        "title": "Professional",
+        "prompt": "Take a picture and apply a professional theme, which emphasizes clarity, composition, and a polished appearance, focus and lighting. The image should containt as much of the original while giving it a refined and sophisticated look, suitable for professional presentations and portfolios."
+      }
+
   ]
 }
